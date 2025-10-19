@@ -1,0 +1,60 @@
+(* Oberon Subset Grammar - EBNF *)
+
+program = "MODULE" identifier ";" { declaration } "BEGIN" { statement } "END" identifier "." ;
+
+declaration = constDeclaration | varDeclaration | procedureDeclaration ;
+
+constDeclaration = "CONST" { identifier "=" expression ";" } ;
+
+varDeclaration = "VAR" { identifier ":" type ";" } ;
+
+procedureDeclaration = "PROCEDURE" identifier [ "(" [ formalParameters ] ")" ] ":" type ";" { declaration } "BEGIN" { statement } "END" identifier ";" ;
+
+formalParameters = fpSection { ";" fpSection } ;
+fpSection = [ "VAR" ] identifier { "," identifier } ":" type ;
+
+type = "INTEGER" | "REAL" | "STRING" | "ARRAY" "[" expression "]" "OF" type ;
+
+statement = assignment | procedureCall | ifStatement | whileStatement | forStatement | compoundStatement ;
+
+assignment = identifier ":=" expression ;
+
+procedureCall = identifier [ "(" [ expression { "," expression } ] ")" ] ;
+
+ifStatement = "IF" expression "THEN" statement [ "ELSE" statement ] "END" ;
+
+whileStatement = "WHILE" expression "DO" statement "END" ;
+
+forStatement = "FOR" identifier ":=" expression "TO" expression "DO" statement "END" ;
+
+compoundStatement = "BEGIN" { statement } "END" ;
+
+expression = simpleExpression [ relation simpleExpression ] ;
+
+simpleExpression = [ "+" | "-" ] term { addOperator term } ;
+
+term = factor { mulOperator factor } ;
+
+factor = number | string | identifier | "(" expression ")" | procedureCall ;
+
+relation = "=" | "#" | "<" | "<=" | ">" | ">=" ;
+
+addOperator = "+" | "-" | "OR" ;
+
+mulOperator = "*" | "/" | "DIV" | "MOD" | "AND" ;
+
+number = integer | real ;
+
+integer = digit { digit } ;
+
+real = digit { digit } "." digit { digit } ;
+
+string = '"' { character } '"' ;
+
+identifier = letter { letter | digit } ;
+
+letter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character = letter | digit | " " | "!" | "#" | "$" | "%" | "&" | "'" | "(" | ")" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "]" | "^" | "_" | "`" | "{" | "|" | "}" | "~" ;

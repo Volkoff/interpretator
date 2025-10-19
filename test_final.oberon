@@ -1,0 +1,8 @@
+MODULE TestFinal;
+VAR x: INTEGER;
+BEGIN
+    x := 42;
+    Write("The answer is: ");
+    Write(x);
+    WriteLn();
+END TestFinal.

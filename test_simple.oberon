@@ -1,0 +1,6 @@
+MODULE Test;
+VAR x: INTEGER;
+BEGIN
+    x := 42;
+    Write(x);
+END Test.
