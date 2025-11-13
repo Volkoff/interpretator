@@ -1,0 +1,18 @@
+MODULE TypesConversions;
+VAR
+  i: INTEGER;
+  r: REAL;
+  s: STRING;
+  arr: ARRAY 5 OF INTEGER;
+BEGIN
+  i := 42;
+  r := 3.14;
+  s := "Hello";
+  arr[0] := i;
+  arr[1] := 10;
+  WriteLn("Integer:", i);
+  WriteLn("Real:", r);
+  WriteLn("String:", s);
+  WriteLn("Array[0]:", arr[0]);
+  WriteLn("Array[1]:", arr[1]);
+END TypesConversions.

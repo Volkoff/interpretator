@@ -79,9 +79,7 @@ class Parser:
             
             if self.current_token.type == TokenType.ARRAY:
                 self.advance()
-                self.expect(TokenType.LBRACKET)
                 size = int(self.expect(TokenType.INTEGER_LITERAL).value)
-                self.expect(TokenType.RBRACKET)
                 self.expect(TokenType.OF)
                 type_token = self.expect(TokenType.INTEGER, TokenType.REAL, TokenType.STRING)
                 type_ = DataType(type_token.value)

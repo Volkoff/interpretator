@@ -8,7 +8,7 @@ constDeclaration = "CONST" { identifier "=" expression ";" } ;
 
 varDeclaration = "VAR" { identifier ":" type ";" } ;
 
-procedureDeclaration = "PROCEDURE" identifier [ "(" [ formalParameters ] ")" ] ":" type ";" { declaration } "BEGIN" { statement } "END" identifier ";" ;
+procedureDeclaration = "PROCEDURE" identifier [ "(" [ formalParameters ] ")" ] ":" type ";" { declaration } "BEGIN" { statement | procedureDeclaration } "END" identifier ";" ;
 
 formalParameters = fpSection { ";" fpSection } ;
 fpSection = [ "VAR" ] identifier { "," identifier } ":" type ;
