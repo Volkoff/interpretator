@@ -91,15 +91,21 @@ class LLVMEmitter:
 
     def allocate_local(self, name: str, decl: VarDeclaration):
         ty = self.llvm_type(decl.type)
-        if decl.array_size is not None:
-            # allocate array as [N x i32] on stack and keep pointer
-            # we will allocate as i32* by using alloca and treat as pointer
+        if decl.array_dimensions is not None:
+            # allocate multi-dimensional array
+            # Pro vícerozměrné pole [D1, D2, ..., Dn] OF TYPE alokujeme jako [D1 x [D2 x ... x [Dn x TYPE]]]
             ptr = f"%{name}"
             self.current_locals[name] = ptr
-            self.current_local_types[name] = ty
-            self.emit(f"  {ptr} = alloca {ty}, align 8")
-            # remember size for index checks (not enforced)
-            self.current_arrays[name] = (ptr, decl.array_size)
+            self.current_local_types[name] = ty  # element type
+            
+            # Vytvořit vnořený typ LLVM pro vícerozměrné pole
+            array_type = ty
+            for dim in reversed(decl.array_dimensions):
+                array_type = f"[{dim} x {array_type}]"
+            
+            self.emit(f"  {ptr} = alloca {array_type}, align 8")
+            # remember dimensions and full array type
+            self.current_arrays[name] = (ptr, decl.array_dimensions, array_type)
         else:
             ptr = f"%{name}"
             self.current_locals[name] = ptr
@@ -128,9 +134,7 @@ class LLVMEmitter:
         # allocate locals declared inside procedure
         for decl in proc.declarations:
             if isinstance(decl, VarDeclaration):
-                ptr = f"%{decl.name}"
-                self.current_locals[decl.name] = ptr
-                self.emit(f"  {ptr} = alloca {self.llvm_type(decl.type)}")
+                self.allocate_local(decl.name, decl)
 
         # emit body
         for stmt in proc.statements:
@@ -165,15 +169,29 @@ class LLVMEmitter:
                 ptr = self.current_locals[stmt.variable]
                 self.emit(f"  store {val_type} {val_reg}, {val_type}* {ptr}")
             elif isinstance(stmt.variable, ArrayAccess):
-                # compute index
+                # compute indices (může být více pro vícerozměrná pole)
                 arr = stmt.variable.name
-                idx_reg, _ = self.emit_expression(stmt.variable.index)
                 if arr not in self.current_locals:
                     raise NameError(f"Array '{arr}' not defined for store")
                 arr_ptr = self.current_locals[arr]
+                elem_type = self.current_local_types[arr]  # typ prvku pole
+                
+                # Get full array type from current_arrays
+                if arr not in self.current_arrays:
+                    raise NameError(f"Array '{arr}' not found in array registry")
+                _, _, array_type = self.current_arrays[arr]
+                
+                # Vygeneruj GEP instrukci s indexy
+                # Pro vícerozměrné pole: getelementptr type, type* ptr, i32 0, i32 idx1, i32 idx2, ...
+                indices_regs = []
+                for idx_expr in stmt.variable.indices:
+                    idx_reg, _ = self.emit_expression(idx_expr)
+                    indices_regs.append(idx_reg)
+                
+                # Vytvoř GEP s 0 jako prvním indexem (pro ptr→array conversion) a pak skutečnými indexy
                 elem_ptr = self.new_reg()
-                # GEP into array: treat as pointer arithmetic for i32*
-                self.emit(f"  {elem_ptr} = getelementptr inbounds i32, i32* {arr_ptr}, i32 {idx_reg}")
+                indices_str = ", i32 0" + "".join(f", i32 {idx}" for idx in indices_regs)
+                self.emit(f"  {elem_ptr} = getelementptr inbounds {array_type}, {array_type}* {arr_ptr}{indices_str}")
                 self.emit(f"  store {val_type} {val_reg}, {val_type}* {elem_ptr}")
 
         elif isinstance(stmt, ProcedureCall):
@@ -194,7 +212,9 @@ class LLVMEmitter:
                 if stmt.name == 'WriteLn':
                     nl = self.add_global_string('\n')
                     nl_ptr = self.new_reg()
-                    self.emit(f"  {nl_ptr} = getelementptr inbounds [{len('\n\00')} x i8], [{len('\n\00')} x i8]* @{nl}, i32 0, i32 0")
+                    # avoid backslashes inside f-string expressions by computing length separately
+                    nl_len = len('\n') + 1
+                    self.emit(f"  {nl_ptr} = getelementptr inbounds [{nl_len} x i8], [{nl_len} x i8]* @{nl}, i32 0, i32 0")
                     self.emit(f"  call i32 (i8*, ...) @printf(i8* {nl_ptr})")
             else:
                 # user procedure call (no return)
@@ -304,13 +324,25 @@ class LLVMEmitter:
             if expr.name not in self.current_locals:
                 raise NameError(f"Array '{expr.name}' not allocated")
             arr_ptr = self.current_locals[expr.name]
-            ty = self.current_local_types[expr.name]
-            idx_reg, _ = self.emit_expression(expr.index)
+            elem_type = self.current_local_types[expr.name]  # typ prvku pole
+            
+            # Get full array type from current_arrays
+            if expr.name not in self.current_arrays:
+                raise NameError(f"Array '{expr.name}' not found in array registry")
+            _, _, array_type = self.current_arrays[expr.name]
+            
+            # Vygeneruj indexy pro vícerozměrné pole
+            indices_regs = []
+            for idx_expr in expr.indices:
+                idx_reg, _ = self.emit_expression(idx_expr)
+                indices_regs.append(idx_reg)
+            
             elem_ptr = self.new_reg()
-            self.emit(f"  {elem_ptr} = getelementptr inbounds {ty}, {ty}* {arr_ptr}, i32 {idx_reg}")
+            indices_str = ", i32 0" + "".join(f", i32 {idx}" for idx in indices_regs)
+            self.emit(f"  {elem_ptr} = getelementptr inbounds {array_type}, {array_type}* {arr_ptr}{indices_str}")
             val = self.new_reg()
-            self.emit(f"  {val} = load {ty}, {ty}* {elem_ptr}")
-            return (val, ty)
+            self.emit(f"  {val} = load {elem_type}, {elem_type}* {elem_ptr}")
+            return (val, elem_type)
 
         elif isinstance(expr, FunctionCall):
             arg_vals = []
@@ -326,7 +358,34 @@ class LLVMEmitter:
         elif isinstance(expr, BinaryExpression):
             l_reg, l_type = self.emit_expression(expr.left)
             r_reg, r_type = self.emit_expression(expr.right)
-            # assume integer arithmetic if both i32
+            
+            # Floating point arithmetic
+            if l_type == 'double' and r_type == 'double':
+                if expr.operator == '+':
+                    out = self.new_reg()
+                    self.emit(f"  {out} = fadd double {l_reg}, {r_reg}")
+                    return (out, 'double')
+                if expr.operator == '-':
+                    out = self.new_reg()
+                    self.emit(f"  {out} = fsub double {l_reg}, {r_reg}")
+                    return (out, 'double')
+                if expr.operator == '*':
+                    out = self.new_reg()
+                    self.emit(f"  {out} = fmul double {l_reg}, {r_reg}")
+                    return (out, 'double')
+                if expr.operator == '/':
+                    out = self.new_reg()
+                    self.emit(f"  {out} = fdiv double {l_reg}, {r_reg}")
+                    return (out, 'double')
+                if expr.operator in ('=', '#', '<', '<=', '>', '>='):
+                    cmp = self.new_reg()
+                    op_map = {'=': 'oeq', '#': 'one', '<': 'olt', '<=': 'ole', '>': 'ogt', '>=': 'oge'}
+                    self.emit(f"  {cmp} = fcmp {op_map[expr.operator]} double {l_reg}, {r_reg}")
+                    z = self.new_reg()
+                    self.emit(f"  {z} = zext i1 {cmp} to i32")
+                    return (z, 'i32')
+            
+            # Integer arithmetic
             if l_type == 'i32' and r_type == 'i32':
                 if expr.operator == '+':
                     out = self.new_reg()
@@ -367,11 +426,9 @@ class LLVMEmitter:
                     out = self.new_reg()
                     self.emit(f"  {out} = or i32 {l_reg}, {r_reg}")
                     return (out, 'i32')
-
-            # Fallback: treat as i32
-            out = self.new_reg()
-            self.emit(f"  {out} = add i32 {l_reg}, {r_reg}")
-            return (out, 'i32')
+            
+            # Type mismatch error
+            raise TypeError(f"Binary operation '{expr.operator}' with incompatible types {l_type} and {r_type}")
 
         elif isinstance(expr, UnaryExpression):
             op_reg, op_type = self.emit_expression(expr.operand)

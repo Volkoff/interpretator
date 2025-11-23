@@ -79,13 +79,28 @@ class Parser:
             
             if self.current_token.type == TokenType.ARRAY:
                 self.advance()
-                size = int(self.expect(TokenType.INTEGER_LITERAL).value)
+                # Parse dimensions: ARRAY[10] OF ... nebo ARRAY 10 OF ... nebo ARRAY[10, 20] OF ...
+                # Support both syntaxes: with and without brackets
+                if self.current_token.type == TokenType.LBRACKET:
+                    self.advance()
+                    dimensions = [int(self.expect(TokenType.INTEGER_LITERAL).value)]
+                    while self.current_token.type == TokenType.COMMA:
+                        self.advance()
+                        dimensions.append(int(self.expect(TokenType.INTEGER_LITERAL).value))
+                    self.expect(TokenType.RBRACKET)
+                else:
+                    # Without brackets: ARRAY 10 OF ... or ARRAY 10, 20 OF ...
+                    dimensions = [int(self.expect(TokenType.INTEGER_LITERAL).value)]
+                    while self.current_token.type == TokenType.COMMA:
+                        self.advance()
+                        dimensions.append(int(self.expect(TokenType.INTEGER_LITERAL).value))
+                
                 self.expect(TokenType.OF)
                 type_token = self.expect(TokenType.INTEGER, TokenType.REAL, TokenType.STRING)
                 type_ = DataType(type_token.value)
                 
                 for name in names:
-                    declarations.append(VarDeclaration(name, type_, size))
+                    declarations.append(VarDeclaration(name, type_, dimensions))
             else:
                 type_token = self.expect(TokenType.INTEGER, TokenType.REAL, TokenType.STRING)
                 type_ = DataType(type_token.value)
@@ -123,7 +138,11 @@ class Parser:
         
         declarations = []
         while self.current_token and self.current_token.type in [TokenType.CONST, TokenType.VAR, TokenType.PROCEDURE]:
-            declarations.append(self.parse_declaration())
+            decl_list = self.parse_declaration()
+            if isinstance(decl_list, list):
+                declarations.extend(decl_list)
+            else:
+                declarations.append(decl_list)
         
         self.expect(TokenType.BEGIN)
         statements = []
@@ -158,9 +177,13 @@ class Parser:
         
         if self.current_token.type == TokenType.ARRAY:
             self.advance()
-            self.expect(TokenType.LBRACKET)
-            size = int(self.expect(TokenType.INTEGER_LITERAL).value)
-            self.expect(TokenType.RBRACKET)
+            # Support both syntaxes: ARRAY[size] and ARRAY size
+            if self.current_token.type == TokenType.LBRACKET:
+                self.advance()
+                size = int(self.expect(TokenType.INTEGER_LITERAL).value)
+                self.expect(TokenType.RBRACKET)
+            else:
+                size = int(self.expect(TokenType.INTEGER_LITERAL).value)
             self.expect(TokenType.OF)
             type_token = self.expect(TokenType.INTEGER, TokenType.REAL, TokenType.STRING)
             type_ = DataType(type_token.value)
@@ -186,14 +209,17 @@ class Parser:
             self.advance()
             
             if self.current_token.type == TokenType.LBRACKET:
-                # Array access
+                # Array access - může být vícerozměrné: a[i, j]
                 self.advance()
-                index = self.parse_expression()
+                indices = [self.parse_expression()]
+                while self.current_token.type == TokenType.COMMA:
+                    self.advance()
+                    indices.append(self.parse_expression())
                 self.expect(TokenType.RBRACKET)
                 self.expect(TokenType.ASSIGN)
                 expression = self.parse_expression()
                 self.expect(TokenType.SEMICOLON)
-                array_access = ArrayAccess(name, index)
+                array_access = ArrayAccess(name, indices)
                 return Assignment(array_access, expression)
             elif self.current_token.type == TokenType.ASSIGN:
                 self.advance()
@@ -201,15 +227,18 @@ class Parser:
                 self.expect(TokenType.SEMICOLON)
                 return Assignment(name, expression)
             else:
-                # Procedure call
+                # Procedure call: require parentheses for call syntax
                 arguments = []
                 if self.current_token.type == TokenType.LPAREN:
                     self.advance()
                     if self.current_token.type != TokenType.RPAREN:
                         arguments = self.parse_arguments()
                     self.expect(TokenType.RPAREN)
-                self.expect(TokenType.SEMICOLON)
-                return ProcedureCall(name, arguments)
+                    self.expect(TokenType.SEMICOLON)
+                    return ProcedureCall(name, arguments)
+                else:
+                    # Bare identifier followed by semicolon is not valid procedure call in this parser
+                    raise SyntaxError(f"Expected '(' after procedure name '{name}' for call, got {self.current_token}")
         
         elif self.current_token.type == TokenType.IF:
             return self.parse_if_statement()
@@ -414,11 +443,14 @@ class Parser:
             self.advance()
             
             if self.current_token.type == TokenType.LBRACKET:
-                # Array access
+                # Array access - může být vícerozměrné: a[i, j]
                 self.advance()
-                index = self.parse_expression()
+                indices = [self.parse_expression()]
+                while self.current_token.type == TokenType.COMMA:
+                    self.advance()
+                    indices.append(self.parse_expression())
                 self.expect(TokenType.RBRACKET)
-                return ArrayAccess(name, index)
+                return ArrayAccess(name, indices)
             elif self.current_token.type == TokenType.LPAREN:
                 # Function call
                 self.advance()

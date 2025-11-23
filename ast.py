@@ -31,10 +31,14 @@ class ConstDeclaration(Declaration):
         self.value = value
 
 class VarDeclaration(Declaration):
-    def __init__(self, name: str, type_: DataType, array_size: Optional[int] = None):
+    def __init__(self, name: str, type_: DataType, array_dimensions: Optional[List[int]] = None):
         self.name = name
         self.type = type_
-        self.array_size = array_size
+        # array_dimensions je List[int] pro vícerozměrná pole (např. [10, 20] pro ARRAY 10, 20 OF INTEGER)
+        # nebo None pro jednoduchou proměnnou
+        self.array_dimensions = array_dimensions
+        # Backwards compatibility: pokud byl volán se starým array_size
+        self.array_size = array_dimensions[0] if array_dimensions and len(array_dimensions) == 1 else None
 
 class ProcedureDeclaration(Declaration):
     def __init__(self, name: str, parameters: List['Parameter'], return_type: Optional[DataType], 
@@ -116,6 +120,9 @@ class FunctionCall(Expression):
         self.arguments = arguments
 
 class ArrayAccess(Expression):
-    def __init__(self, name: str, index: Expression):
+    def __init__(self, name: str, indices: List[Expression]):
         self.name = name
-        self.index = index
+        # indices je List[Expression] pro vícerozměrná pole (např. [i, j] pro a[i, j])
+        self.indices = indices
+        # Backwards compatibility
+        self.index = indices[0] if indices and len(indices) == 1 else None

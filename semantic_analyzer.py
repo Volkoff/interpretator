@@ -98,8 +98,8 @@ class SemanticAnalyzer:
     def analyze_var_declaration(self, declaration: VarDeclaration):
         """Analyze a variable declaration"""
         # Determine the actual type
-        if declaration.array_size is not None:
-            # This is an array declaration
+        if declaration.array_dimensions is not None:
+            # This is an array declaration (může být vícerozměrné)
             symbol_type = DataType.ARRAY
         else:
             # This is a simple variable
@@ -185,10 +185,11 @@ class SemanticAnalyzer:
             if symbol.type != DataType.ARRAY:
                 raise TypeError(f"'{assignment.variable.name}' is not an array")
             
-            # Analyze index expression
-            index_type = self.analyze_expression(assignment.variable.index)
-            if index_type != DataType.INTEGER:
-                raise TypeError("Array index must be integer")
+            # Analyze index expressions (může jich být více pro vícerozměrná pole)
+            for idx_expr in assignment.variable.indices:
+                index_type = self.analyze_expression(idx_expr)
+                if index_type != DataType.INTEGER:
+                    raise TypeError("Array index must be integer")
             
             # Analyze expression type
             expression_type = self.analyze_expression(assignment.expression)
@@ -287,9 +288,11 @@ class SemanticAnalyzer:
                 if not symbol:
                     raise NameError(f"Array '{expression.name}' not defined")
             
-            index_type = self.analyze_expression(expression.index)
-            if index_type != DataType.INTEGER:
-                raise TypeError("Array index must be integer")
+            # Kontrola všech indexů (může jich být více pro vícerozměrná pole)
+            for idx_expr in expression.indices:
+                index_type = self.analyze_expression(idx_expr)
+                if index_type != DataType.INTEGER:
+                    raise TypeError("Array index must be integer")
             
             return symbol.type
         
@@ -343,14 +346,15 @@ class SemanticAnalyzer:
             raise TypeError(f"Unknown expression type: {type(expression)}")
     
     def is_type_compatible(self, target_type: DataType, source_type: DataType) -> bool:
-        """Check if two types are compatible for assignment or operation"""
+        """Check if two types are compatible for assignment or operation.
+        
+        NOTE: Strict type checking - no automatic conversions allowed.
+        Integer to Real conversion must be done explicitly via a conversion function.
+        """
         if target_type == source_type:
             return True
         
-        # Integer can be assigned to Real
-        if target_type == DataType.REAL and source_type == DataType.INTEGER:
-            return True
-        
+        # No automatic conversions - strict typing required by assignment specification
         return False
 
 if __name__ == "__main__":

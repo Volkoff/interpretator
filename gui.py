@@ -380,15 +380,20 @@ END HelloWorld."""
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
     
-    def compile_code(self):
-        """Compile the current code"""
+    def compile_code(self, on_finished=None):
+        """Compile the current code. If `on_finished` is provided and compilation succeeds,
+        the callable will be invoked on the main thread after compilation finishes.
+        """
         if self.is_compiling:
             return
-        
+
+        # store optional callback to run on successful compilation
+        self._compile_callback = on_finished
+
         self.is_compiling = True
         self.progress.start()
         self.status_label.config(text="Compiling...")
-        
+
         # Run compilation in a separate thread
         thread = threading.Thread(target=self._compile_thread)
         thread.daemon = True
@@ -403,11 +408,36 @@ END HelloWorld."""
             self.output_text.config(state=tk.NORMAL)
             self.output_text.delete(1.0, tk.END)
             
-            # Compile the code
-            output = self.compiler.compile_source(source)
+            # Compile the code (now generates native executable)
+            import tempfile
+            import os
             
-            # Display results
-            self.root.after(0, self._display_compilation_results, output)
+            # Create a temporary file for source
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.oberon', delete=False, encoding='utf-8') as tmp:
+                tmp.write(source)
+                tmp_path = tmp.name
+            
+            try:
+                messages, exe_path = self.compiler.compile_file(tmp_path, build_native=True)
+                self._last_exe_path = exe_path  # Store for running
+                
+                # Display results
+                self.root.after(0, self._display_compilation_results, messages)
+                
+                # record whether compilation had errors
+                has_errors = any("error" in msg.lower() or "Error" in msg for msg in messages) or not exe_path
+                self._last_compile_has_errors = has_errors
+                
+                # if compilation succeeded and a callback was provided, invoke it on main thread
+                if not has_errors and getattr(self, '_compile_callback', None):
+                    cb = self._compile_callback
+                    self.root.after(0, cb)
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
             
         except Exception as e:
             self.root.after(0, self._display_error, f"Compilation error: {e}")
@@ -418,24 +448,17 @@ END HelloWorld."""
         """Display compilation results"""
         self.output_text.config(state=tk.NORMAL)
         
-        # Check if there are any actual errors (lines starting with "Error:" or "Semantic error:")
-        has_errors = any(line.startswith("Error:") or line.startswith("Semantic error:") or line.startswith("Compilation error:") for line in output)
-        
-        if has_errors:
-            # Display errors
+        # output je list zpráv z kompilátoru
+        if not output:
+            self.output_text.insert(tk.END, "No output from compiler\n", 'error')
+        else:
+            # Zobraz všechny zprávy
             for line in output:
-                if line.startswith("Error:") or line.startswith("Semantic error:") or line.startswith("Compilation error:"):
+                # Zkontroluj, jestli jde o chybu
+                if any(keyword in line.lower() for keyword in ["error", "failed"]):
                     self.output_text.insert(tk.END, line + "\n", 'error')
                 else:
-                    self.output_text.insert(tk.END, line + "\n")
-        elif not output:
-            self.output_text.insert(tk.END, "Compilation successful!\n", 'success')
-        else:
-            # This is program output, not compilation errors
-            self.output_text.insert(tk.END, "Compilation successful!\n", 'success')
-            self.output_text.insert(tk.END, "\n=== Program Output ===\n", 'success')
-            for line in output:
-                self.output_text.insert(tk.END, line + "\n")
+                    self.output_text.insert(tk.END, line + "\n", 'success')
         
         self.output_text.config(state=tk.DISABLED)
         self.output_text.see(tk.END)
@@ -468,7 +491,7 @@ END HelloWorld."""
         thread.start()
     
     def _run_thread(self):
-        """Execution thread"""
+        """Execution thread - compiles and runs the compiled executable"""
         try:
             source = self.editor.get(1.0, tk.END)
             
@@ -476,21 +499,56 @@ END HelloWorld."""
             self.output_text.config(state=tk.NORMAL)
             self.output_text.delete(1.0, tk.END)
             
-            # Compile and run
-            output = self.compiler.compile_source(source)
+            # Compile to native executable
+            import tempfile
+            import os
+            import subprocess
             
-            # Check for actual errors (lines starting with error prefixes)
-            has_errors = any(line.startswith("Error:") or line.startswith("Semantic error:") or line.startswith("Compilation error:") for line in output)
+            # Create a temporary file for source
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.oberon', delete=False, encoding='utf-8') as tmp:
+                tmp.write(source)
+                tmp_path = tmp.name
             
-            if has_errors:
-                # Display compilation errors
-                self.root.after(0, self._display_compilation_results, output)
-            else:
-                # Program executed successfully, show output
-                if output:
-                    self.root.after(0, self._display_program_output, output)
+            try:
+                messages, exe_path = self.compiler.compile_file(tmp_path, build_native=True)
+                
+                # Check for compilation errors
+                has_errors = any("error" in msg.lower() or "Error" in msg for msg in messages) or not exe_path
+                
+                if has_errors:
+                    # Display compilation errors
+                    self.root.after(0, self._display_compilation_results, messages)
                 else:
-                    self.root.after(0, self._display_program_output, ["Program executed successfully (no output)"])
+                    # Run the compiled executable
+                    try:
+                        proc = subprocess.run([exe_path], capture_output=True, text=True, timeout=10)
+                        output_lines = proc.stdout.split('\n') if proc.stdout else []
+                        
+                        if proc.returncode != 0 and proc.stderr:
+                            output_lines.append(f"\n[Runtime Error]\n{proc.stderr}")
+                        
+                        self.root.after(0, self._display_program_output, output_lines)
+                        
+                        # Clean up executable after running
+                        try:
+                            os.unlink(exe_path)
+                            # Also clean up .ll file
+                            ll_path = os.path.splitext(tmp_path)[0] + '.ll'
+                            if os.path.exists(ll_path):
+                                os.unlink(ll_path)
+                        except:
+                            pass
+                            
+                    except subprocess.TimeoutExpired:
+                        self.root.after(0, self._display_error, "Program execution timed out (10s limit)")
+                    except Exception as e:
+                        self.root.after(0, self._display_error, f"Error running compiled program: {e}")
+            finally:
+                # Clean up temp source file
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
             
         except Exception as e:
             self.root.after(0, self._display_error, f"Runtime error: {e}")
@@ -510,9 +568,8 @@ END HelloWorld."""
     
     def compile_and_run(self):
         """Compile and run the code"""
-        self.compile_code()
-        # Wait a bit for compilation to finish, then run
-        self.root.after(1000, self.run_code)
+        # Compile, and if successful, call `run_code` automatically
+        self.compile_code(on_finished=self.run_code)
     
     def clear_output(self):
         """Clear the output area"""
@@ -531,89 +588,38 @@ END HelloWorld."""
         notebook = ttk.Notebook(examples_window)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Hello World example
-        hello_frame = ttk.Frame(notebook)
-        notebook.add(hello_frame, text="Hello World")
+        # Load examples from examples directory
+        examples_dir = "examples"
+        texts = []
         
-        hello_text = scrolledtext.ScrolledText(hello_frame, wrap=tk.WORD, font=('Consolas', 10))
-        hello_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        hello_text.insert(1.0, """MODULE HelloWorld;
-VAR message: STRING;
-BEGIN
-    message := "Hello, World!";
-    Write(message);
-    WriteLn();
-END HelloWorld.""")
-        # Keep text selectable for copying
-        
-        # Arithmetic example
-        arith_frame = ttk.Frame(notebook)
-        notebook.add(arith_frame, text="Arithmetic")
-        
-        arith_text = scrolledtext.ScrolledText(arith_frame, wrap=tk.WORD, font=('Consolas', 10))
-        arith_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        arith_text.insert(1.0, """MODULE Arithmetic;
-VAR a, b, sum, product: INTEGER;
-    x, y, result: REAL;
-BEGIN
-    a := 10;
-    b := 20;
-    sum := a + b;
-    product := a * b;
-    
-    x := 3.14;
-    y := 2.0;
-    result := x * y;
-    
-    Write("Sum: ");
-    Write(sum);
-    WriteLn();
-    Write("Product: ");
-    Write(product);
-    WriteLn();
-    Write("Real result: ");
-    Write(result);
-    WriteLn();
-END Arithmetic.""")
-        # Keep text selectable for copying
-        
-        # Control structures example
-        control_frame = ttk.Frame(notebook)
-        notebook.add(control_frame, text="Control Structures")
-        
-        control_text = scrolledtext.ScrolledText(control_frame, wrap=tk.WORD, font=('Consolas', 10))
-        control_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        control_text.insert(1.0, """MODULE ControlStructures;
-VAR i, n: INTEGER;
-BEGIN
-    n := 5;
-    
-    (* For loop example *)
-    FOR i := 1 TO n DO
-        Write("Iteration: ");
-        Write(i);
-        WriteLn();
-    END;
-    
-    (* While loop example *)
-    i := 1;
-    WHILE i <= 3 DO
-        Write("While iteration: ");
-        Write(i);
-        WriteLn();
-        i := i + 1;
-    END;
-    
-    (* If statement example *)
-    IF n > 3 THEN
-        Write("n is greater than 3");
-        WriteLn();
-    ELSE
-        Write("n is 3 or less");
-        WriteLn();
-    END;
-END ControlStructures.""")
-        # Keep text selectable for copying
+        if os.path.exists(examples_dir):
+            example_files = [f for f in os.listdir(examples_dir) if f.endswith('.oberon')]
+            example_files.sort()  # Sort alphabetically
+            
+            for file in example_files:
+                name = file.replace('.oberon', '').replace('_', ' ').title()
+                frame = ttk.Frame(notebook)
+                notebook.add(frame, text=name)
+                
+                text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=('Consolas', 10))
+                text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                
+                try:
+                    with open(os.path.join(examples_dir, file), 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    text.insert(1.0, content)
+                except:
+                    text.insert(1.0, f"Could not load {file}")
+                
+                texts.append(text)
+        else:
+            # Fallback if examples directory doesn't exist
+            frame = ttk.Frame(notebook)
+            notebook.add(frame, text="No Examples")
+            text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=('Consolas', 10))
+            text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            text.insert(1.0, "Examples directory not found.")
+            texts.append(text)
         
         # Buttons
         button_frame = ttk.Frame(examples_window)
@@ -624,12 +630,7 @@ END ControlStructures.""")
             current_tab = notebook.select()
             tab_index = notebook.index(current_tab)
             
-            if tab_index == 0:  # Hello World
-                content = hello_text.get(1.0, tk.END)
-            elif tab_index == 1:  # Arithmetic
-                content = arith_text.get(1.0, tk.END)
-            elif tab_index == 2:  # Control Structures
-                content = control_text.get(1.0, tk.END)
+            content = texts[tab_index].get(1.0, tk.END)
             
             # Load into main editor
             self.editor.delete(1.0, tk.END)
@@ -642,12 +643,7 @@ END ControlStructures.""")
             current_tab = notebook.select()
             tab_index = notebook.index(current_tab)
             
-            if tab_index == 0:  # Hello World
-                content = hello_text.get(1.0, tk.END)
-            elif tab_index == 1:  # Arithmetic
-                content = arith_text.get(1.0, tk.END)
-            elif tab_index == 2:  # Control Structures
-                content = control_text.get(1.0, tk.END)
+            content = texts[tab_index].get(1.0, tk.END)
             
             # Copy to clipboard
             self.root.clipboard_clear()
