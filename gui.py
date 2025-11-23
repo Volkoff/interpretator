@@ -23,7 +23,6 @@ class OberonGUI:
         self.root = root
         self.root.title("Oberon Compiler IDE")
         self.root.geometry("1200x800")
-        self.root.configure(bg='#f0f0f0')
         
         # Compiler instance
         self.compiler = Compiler()
@@ -32,6 +31,8 @@ class OberonGUI:
         
         # Configure styles
         self.setup_styles()
+        
+        self.root.configure(bg=self.colors['bg'])
         
         # Create GUI components
         self.create_widgets()
@@ -46,19 +47,37 @@ class OberonGUI:
         self.style = ttk.Style()
         self.style.theme_use('clam')
         
-        # Configure colors
+        # Configure colors for dark mode
         self.colors = {
-            'bg': '#f8f9fa',
-            'editor_bg': '#ffffff',
-            'output_bg': '#1e1e1e',
-            'output_fg': '#d4d4d4',
-            'error_fg': '#f44747',
-            'success_fg': '#4ec9b0',
-            'keyword_fg': '#569cd6',
-            'string_fg': '#ce9178',
-            'comment_fg': '#6a9955',
-            'number_fg': '#b5cea8'
+            'bg': '#2b2b2b',          # Dark gray background
+            'fg': '#ffffff',          # White text
+            'menu_bg': '#3c3c3c',      # Menu background
+            'menu_fg': '#ffffff',      # Menu text
+            'button_bg': '#4a4a4a',    # Button background
+            'button_fg': '#ffffff',    # Button text
+            'entry_bg': '#1e1e1e',     # Text entry background
+            'entry_fg': '#ffffff',     # Text entry text
+            'editor_bg': '#1e1e1e',    # Editor background
+            'output_bg': '#1e1e1e',    # Output background
+            'output_fg': '#d4d4d4',    # Output text
+            'error_fg': '#ff6b6b',     # Error text (red)
+            'success_fg': '#51cf66',   # Success text (green)
+            'keyword_fg': '#74c0fc',   # Keywords (blue)
+            'string_fg': '#ffd43b',    # Strings (yellow)
+            'comment_fg': '#8ce99a',   # Comments (green)
+            'number_fg': '#ffd43b',    # Numbers (yellow)
+            'operator_fg': '#ffd43b'   # Operators (yellow)
         }
+        
+        # Configure ttk styles for dark mode
+        self.style.configure('TFrame', background=self.colors['bg'])
+        self.style.configure('TLabel', background=self.colors['bg'], foreground=self.colors['fg'])
+        self.style.configure('TButton', background=self.colors['button_bg'], foreground=self.colors['button_fg'])
+        self.style.configure('TLabelFrame', background=self.colors['bg'], foreground=self.colors['fg'])
+        self.style.configure('TLabelFrame.Label', background=self.colors['bg'], foreground=self.colors['fg'])
+        self.style.configure('TNotebook', background=self.colors['bg'])
+        self.style.configure('TNotebook.Tab', background=self.colors['menu_bg'], foreground=self.colors['menu_fg'])
+        self.style.map('TButton', background=[('active', self.colors['button_bg'])])
     
     def create_widgets(self):
         """Create the main GUI widgets"""
@@ -87,9 +106,9 @@ class OberonGUI:
             wrap=tk.WORD,
             font=('Consolas', 11),
             bg=self.colors['editor_bg'],
-            fg='#000000',
-            insertbackground='#000000',
-            selectbackground='#3399ff',
+            fg=self.colors['entry_fg'],
+            insertbackground=self.colors['entry_fg'],
+            selectbackground='#4a90e2',
             selectforeground='#ffffff',
             undo=True,
             maxundo=50
@@ -156,11 +175,11 @@ class OberonGUI:
     
     def setup_menus(self):
         """Setup the menu bar"""
-        menubar = tk.Menu(self.root)
+        menubar = tk.Menu(self.root, bg=self.colors['menu_bg'], fg=self.colors['menu_fg'])
         self.root.config(menu=menubar)
         
         # File menu
-        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu = tk.Menu(menubar, tearoff=0, bg=self.colors['menu_bg'], fg=self.colors['menu_fg'])
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="New", command=self.new_file, accelerator="Ctrl+N")
         file_menu.add_command(label="Open", command=self.open_file, accelerator="Ctrl+O")
@@ -170,7 +189,7 @@ class OberonGUI:
         file_menu.add_command(label="Exit", command=self.root.quit)
         
         # Edit menu
-        edit_menu = tk.Menu(menubar, tearoff=0)
+        edit_menu = tk.Menu(menubar, tearoff=0, bg=self.colors['menu_bg'], fg=self.colors['menu_fg'])
         menubar.add_cascade(label="Edit", menu=edit_menu)
         edit_menu.add_command(label="Undo", command=lambda: self.editor.edit_undo(), accelerator="Ctrl+Z")
         edit_menu.add_command(label="Redo", command=lambda: self.editor.edit_redo(), accelerator="Ctrl+Y")
@@ -182,14 +201,14 @@ class OberonGUI:
         edit_menu.add_command(label="Select All", command=self.select_all_text, accelerator="Ctrl+A")
         
         # Run menu
-        run_menu = tk.Menu(menubar, tearoff=0)
+        run_menu = tk.Menu(menubar, tearoff=0, bg=self.colors['menu_bg'], fg=self.colors['menu_fg'])
         menubar.add_cascade(label="Run", menu=run_menu)
         run_menu.add_command(label="Compile", command=self.compile_code, accelerator="F5")
         run_menu.add_command(label="Run", command=self.run_code, accelerator="F6")
         run_menu.add_command(label="Compile & Run", command=self.compile_and_run, accelerator="F7")
         
         # Help menu
-        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu = tk.Menu(menubar, tearoff=0, bg=self.colors['menu_bg'], fg=self.colors['menu_fg'])
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_about)
         help_menu.add_command(label="Oberon Syntax", command=self.show_syntax_help)
@@ -264,7 +283,7 @@ END HelloWorld."""
         self.editor.tag_configure('string', foreground=self.colors['string_fg'])
         self.editor.tag_configure('comment', foreground=self.colors['comment_fg'], font=('Consolas', 11, 'italic'))
         self.editor.tag_configure('number', foreground=self.colors['number_fg'])
-        self.editor.tag_configure('operator', foreground='#dcdcaa')
+        self.editor.tag_configure('operator', foreground=self.colors['operator_fg'])
         
         # Apply highlighting
         lines = content.split('\n')
@@ -582,7 +601,7 @@ END HelloWorld."""
         examples_window = tk.Toplevel(self.root)
         examples_window.title("Oberon Examples")
         examples_window.geometry("600x400")
-        examples_window.configure(bg='#f0f0f0')
+        examples_window.configure(bg=self.colors['bg'])
         
         # Create notebook for different examples
         notebook = ttk.Notebook(examples_window)
@@ -601,7 +620,7 @@ END HelloWorld."""
                 frame = ttk.Frame(notebook)
                 notebook.add(frame, text=name)
                 
-                text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=('Consolas', 10))
+                text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=('Consolas', 10), bg=self.colors['entry_bg'], fg=self.colors['entry_fg'])
                 text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
                 
                 try:
@@ -616,7 +635,7 @@ END HelloWorld."""
             # Fallback if examples directory doesn't exist
             frame = ttk.Frame(notebook)
             notebook.add(frame, text="No Examples")
-            text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=('Consolas', 10))
+            text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=('Consolas', 10), bg=self.colors['entry_bg'], fg=self.colors['entry_fg'])
             text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
             text.insert(1.0, "Examples directory not found.")
             texts.append(text)
@@ -675,9 +694,9 @@ Built with Python and Tkinter."""
         help_window = tk.Toplevel(self.root)
         help_window.title("Oberon Syntax Help")
         help_window.geometry("700x500")
-        help_window.configure(bg='#f0f0f0')
+        help_window.configure(bg=self.colors['bg'])
         
-        help_text = scrolledtext.ScrolledText(help_window, wrap=tk.WORD, font=('Consolas', 10))
+        help_text = scrolledtext.ScrolledText(help_window, wrap=tk.WORD, font=('Consolas', 10), bg=self.colors['entry_bg'], fg=self.colors['entry_fg'])
         help_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         syntax_help = """Oberon Language Syntax Reference
