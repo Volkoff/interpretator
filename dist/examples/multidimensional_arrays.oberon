@@ -1,0 +1,35 @@
+MODULE MultiDimensionalArrays;
+VAR matrix: ARRAY 3, 4 OF INTEGER;
+    i, j, sum: INTEGER;
+
+BEGIN
+    (* Inicializace 2D pole *)
+    FOR i := 0 TO 2 DO
+        FOR j := 0 TO 3 DO
+            matrix[i, j] := i * 10 + j;
+        END;
+    END;
+    
+    (* Výpis 2D pole *)
+    Write("Matrix contents:");
+    WriteLn();
+    FOR i := 0 TO 2 DO
+        FOR j := 0 TO 3 DO
+            Write(matrix[i, j]);
+            Write(" ");
+        END;
+        WriteLn();
+    END;
+    
+    (* Výpočet součtu všech prvků *)
+    sum := 0;
+    FOR i := 0 TO 2 DO
+        FOR j := 0 TO 3 DO
+            sum := sum + matrix[i, j];
+        END;
+    END;
+    
+    Write("Sum of all elements: ");
+    Write(sum);
+    WriteLn();
+END MultiDimensionalArrays.

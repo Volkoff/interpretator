@@ -1,0 +1,24 @@
+MODULE NestedProcedures;
+VAR
+  outer_var: INTEGER;
+
+PROCEDURE OuterProc;
+VAR
+  local_var: INTEGER;
+
+  PROCEDURE InnerProc;
+  BEGIN
+    local_var := outer_var + 1;
+    WriteLn("Inner: local_var =", local_var);
+  END InnerProc;
+
+BEGIN
+  outer_var := 5;
+  local_var := 10;
+  WriteLn("Outer: outer_var =", outer_var);
+  InnerProc();
+END OuterProc;
+
+BEGIN
+  OuterProc();
+END NestedProcedures.

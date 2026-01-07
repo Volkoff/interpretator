@@ -1,0 +1,7 @@
+MODULE HelloWorld;
+VAR message: STRING;
+BEGIN
+    message := "Hello, World!";
+    Write(message);
+    WriteLn();
+END HelloWorld.
