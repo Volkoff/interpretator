@@ -1,8 +1,3 @@
-"""
-GUI Application for Oberon Compiler
-A modern interface for writing, compiling, and running Oberon programs
-"""
-
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog, font
 import sys
@@ -11,7 +6,6 @@ from typing import List, Optional
 import threading
 import time
 
-# Import compiler components
 from lexer import Lexer, TokenType
 from parser import Parser
 from semantic_analyzer import SemanticAnalyzer
@@ -131,10 +125,16 @@ class OberonGUI:
             bg=self.colors['output_bg'],
             fg=self.colors['output_fg'],
             insertbackground=self.colors['output_fg'],
-            state=tk.DISABLED,
-            height=15
+            state=tk.NORMAL,
+            height=15,
+            relief=tk.SUNKEN,
+            borderwidth=1
         )
         self.output_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Make output text read-only but selectable
+        self.output_text.bind('<Button-3>', self.show_output_context_menu)
+        self.output_text.bind('<Control-c>', self.copy_output_text)
         
         # Status frame
         status_frame = ttk.Frame(right_frame)
@@ -196,6 +196,7 @@ class OberonGUI:
         edit_menu.add_separator()
         edit_menu.add_command(label="Cut", command=self.cut_text, accelerator="Ctrl+X")
         edit_menu.add_command(label="Copy", command=self.copy_text, accelerator="Ctrl+C")
+        edit_menu.add_command(label="Copy Output", command=self.copy_output_text)
         edit_menu.add_command(label="Paste", command=self.paste_text, accelerator="Ctrl+V")
         edit_menu.add_separator()
         edit_menu.add_command(label="Select All", command=self.select_all_text, accelerator="Ctrl+A")
@@ -466,6 +467,7 @@ END HelloWorld."""
     def _display_compilation_results(self, output):
         """Display compilation results"""
         self.output_text.config(state=tk.NORMAL)
+        self.output_text.delete(1.0, tk.END)
         
         # output je list zpráv z kompilátoru
         if not output:
@@ -479,14 +481,13 @@ END HelloWorld."""
                 else:
                     self.output_text.insert(tk.END, line + "\n", 'success')
         
-        self.output_text.config(state=tk.DISABLED)
         self.output_text.see(tk.END)
     
     def _display_error(self, error_msg):
         """Display error message"""
         self.output_text.config(state=tk.NORMAL)
+        self.output_text.delete(1.0, tk.END)
         self.output_text.insert(tk.END, error_msg + "\n", 'error')
-        self.output_text.config(state=tk.DISABLED)
         self.output_text.see(tk.END)
     
     def _compilation_finished(self):
@@ -531,13 +532,19 @@ END HelloWorld."""
             try:
                 messages, exe_path = self.compiler.compile_file(tmp_path, build_native=True)
                 
-                # Check for compilation errors
-                has_errors = any("error" in msg.lower() or "Error" in msg for msg in messages) or not exe_path
+                # Check if program was executed in interpreter mode (no exe_path but messages show success)
+                interpreter_mode = not exe_path and any("interpreter" in msg.lower() and "successfully" in msg.lower() for msg in messages)
+                
+                # Check for actual errors (not just lack of executable)
+                has_errors = any("error" in msg.lower() for msg in messages) and not interpreter_mode
                 
                 if has_errors:
                     # Display compilation errors
                     self.root.after(0, self._display_compilation_results, messages)
-                else:
+                elif interpreter_mode:
+                    # Program was executed by interpreter
+                    self.root.after(0, self._display_compilation_results, messages)
+                elif exe_path:
                     # Run the compiled executable
                     try:
                         proc = subprocess.run([exe_path], capture_output=True, text=True, timeout=10)
@@ -577,12 +584,12 @@ END HelloWorld."""
     def _display_program_output(self, output):
         """Display program output"""
         self.output_text.config(state=tk.NORMAL)
+        self.output_text.delete(1.0, tk.END)
         
         self.output_text.insert(tk.END, "=== Program Output ===\n", 'success')
         for line in output:
             self.output_text.insert(tk.END, line + "\n")
         
-        self.output_text.config(state=tk.DISABLED)
         self.output_text.see(tk.END)
     
     def compile_and_run(self):
@@ -594,7 +601,6 @@ END HelloWorld."""
         """Clear the output area"""
         self.output_text.config(state=tk.NORMAL)
         self.output_text.delete(1.0, tk.END)
-        self.output_text.config(state=tk.DISABLED)
     
     def show_examples(self):
         """Show example code dialog"""
@@ -803,6 +809,69 @@ END Example."""
         # Insert 4 spaces instead of tab
         self.editor.insert(tk.INSERT, "    ")
         return "break"  # Prevent default tab behavior
+    
+    def copy_output_text(self, event=None):
+        """Copy selected text from output"""
+        try:
+            # Get selected text from output
+            selected_text = self.output_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            if selected_text:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(selected_text)
+                self.status_label.config(text="Text copied to clipboard")
+            else:
+                # If no selection, copy all text
+                all_text = self.output_text.get("1.0", tk.END)
+                if all_text.strip():
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(all_text)
+                    self.status_label.config(text="All output copied to clipboard")
+        except tk.TclError:
+            # No selection
+            all_text = self.output_text.get("1.0", tk.END)
+            if all_text.strip():
+                self.root.clipboard_clear()
+                self.root.clipboard_append(all_text)
+                self.status_label.config(text="All output copied to clipboard")
+        return "break"
+    
+    def show_output_context_menu(self, event):
+        """Show context menu for output text"""
+        context_menu = tk.Menu(self.root, tearoff=0, bg=self.colors['menu_bg'], fg=self.colors['menu_fg'])
+        
+        # Check if there's selected text
+        try:
+            selected_text = self.output_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            context_menu.add_command(label="Copy Selected", command=self.copy_output_text)
+        except tk.TclError:
+            # No selection
+            pass
+        
+        # Always show "Copy All" option
+        context_menu.add_command(label="Copy All", command=lambda: self._copy_all_output())
+        context_menu.add_separator()
+        context_menu.add_command(label="Select All", command=self._select_all_output)
+        context_menu.add_command(label="Clear", command=self.clear_output)
+        
+        # Display the menu at cursor position
+        try:
+            context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            context_menu.grab_release()
+    
+    def _copy_all_output(self):
+        """Copy all text from output to clipboard"""
+        all_text = self.output_text.get("1.0", tk.END)
+        if all_text.strip():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(all_text)
+            self.update_status("All output copied to clipboard")
+    
+    def _select_all_output(self):
+        """Select all text in output"""
+        self.output_text.tag_add(tk.SEL, "1.0", tk.END)
+        self.output_text.mark_set(tk.INSERT, "1.0")
+        self.output_text.see(tk.INSERT)
 
 def main():
     """Main entry point for the GUI application"""

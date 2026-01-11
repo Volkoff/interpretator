@@ -1,14 +1,8 @@
-"""
-Lexer for Oberon subset compiler
-Tokenizes source code into tokens for parsing
-"""
-
 import re
 from enum import Enum
 from typing import List, Optional, Tuple
 
 class TokenType(Enum):
-    # Keywords
     MODULE = "MODULE"
     BEGIN = "BEGIN"
     END = "END"
@@ -22,15 +16,14 @@ class TokenType(Enum):
     DO = "DO"
     FOR = "FOR"
     TO = "TO"
+    RETURN = "RETURN"
     
-    # Types
     INTEGER = "INTEGER"
     REAL = "REAL"
     STRING = "STRING"
     ARRAY = "ARRAY"
     OF = "OF"
     
-    # Operators
     ASSIGN = ":="
     PLUS = "+"
     MINUS = "-"
@@ -41,7 +34,6 @@ class TokenType(Enum):
     AND = "AND"
     OR = "OR"
     
-    # Relations
     EQUAL = "="
     NOT_EQUAL = "#"
     LESS = "<"
@@ -49,7 +41,6 @@ class TokenType(Enum):
     GREATER = ">"
     GREATER_EQUAL = ">="
     
-    # Delimiters
     SEMICOLON = ";"
     COLON = ":"
     COMMA = ","
@@ -59,13 +50,11 @@ class TokenType(Enum):
     RBRACKET = "]"
     DOT = "."
     
-    # Literals
     IDENTIFIER = "IDENTIFIER"
     INTEGER_LITERAL = "INTEGER_LITERAL"
     REAL_LITERAL = "REAL_LITERAL"
     STRING_LITERAL = "STRING_LITERAL"
     
-    # Special
     EOF = "EOF"
     NEWLINE = "NEWLINE"
 
@@ -87,7 +76,6 @@ class Lexer:
         self.column = 1
         self.tokens = []
         
-        # Keywords mapping
         self.keywords = {
             'MODULE': TokenType.MODULE,
             'BEGIN': TokenType.BEGIN,
@@ -102,6 +90,7 @@ class Lexer:
             'DO': TokenType.DO,
             'FOR': TokenType.FOR,
             'TO': TokenType.TO,
+            'RETURN': TokenType.RETURN,
             'INTEGER': TokenType.INTEGER,
             'REAL': TokenType.REAL,
             'STRING': TokenType.STRING,
@@ -114,7 +103,7 @@ class Lexer:
         }
     
     def tokenize(self) -> List[Token]:
-        """Tokenize the source code"""
+        """Tokenizuje zdrojovy kod"""
         while self.position < len(self.source):
             self.skip_whitespace()
             
@@ -182,7 +171,7 @@ class Lexer:
         return self.tokens
     
     def read_identifier(self):
-        """Read an identifier or keyword"""
+        """Cte identifikator nebo klicove slovo"""
         start = self.position
         while self.position < len(self.source) and (self.source[self.position].isalnum() or self.source[self.position] == '_'):
             self.advance()
@@ -190,10 +179,10 @@ class Lexer:
         value = self.source[start:self.position]
         token_type = self.keywords.get(value.upper(), TokenType.IDENTIFIER)
         self.add_token(token_type, value)
-        self.position -= 1  # Back up one position since advance() will be called
+        self.position -= 1
     
     def read_number(self):
-        """Read a number (integer or real)"""
+        """Cte cislo (cele nebo realne)"""
         start = self.position
         while self.position < len(self.source) and self.source[self.position].isdigit():
             self.advance()
@@ -208,11 +197,11 @@ class Lexer:
             value = self.source[start:self.position]
             self.add_token(TokenType.INTEGER_LITERAL, value)
         
-        self.position -= 1  # Back up one position since advance() will be called
+        self.position -= 1
     
     def read_string(self):
-        """Read a string literal"""
-        self.advance()  # Skip opening quote
+        """Cte retezec"""
+        self.advance()
         start = self.position
         
         while self.position < len(self.source) and self.source[self.position] != '"':
@@ -225,7 +214,7 @@ class Lexer:
         self.add_token(TokenType.STRING_LITERAL, value)
     
     def skip_whitespace(self):
-        """Skip whitespace characters and comments"""
+        """Preskakuje mezery a komentare"""
         while self.position < len(self.source):
             if self.source[self.position].isspace():
                 if self.source[self.position] == '\n':
@@ -233,13 +222,12 @@ class Lexer:
                     self.column = 1
                 self.advance()
             elif self.position + 1 < len(self.source) and self.source[self.position] == '(' and self.source[self.position + 1] == '*':
-                # Skip comments (* ... *)
-                self.advance()  # Skip '('
-                self.advance()  # Skip '*'
+                self.advance()
+                self.advance()
                 while self.position < len(self.source):
                     if self.position + 1 < len(self.source) and self.source[self.position] == '*' and self.source[self.position + 1] == ')':
-                        self.advance()  # Skip '*'
-                        self.advance()  # Skip ')'
+                        self.advance()
+                        self.advance()
                         break
                     if self.source[self.position] == '\n':
                         self.line += 1
@@ -249,34 +237,18 @@ class Lexer:
                 break
     
     def peek(self, offset: int = 1) -> Optional[str]:
-        """Peek at the next character without advancing"""
+        """Vrací další znak bez posunu"""
         if self.position + offset < len(self.source):
             return self.source[self.position + offset]
         return None
     
     def advance(self):
-        """Advance to the next character"""
+        """Posune se na dalsi znak"""
         if self.position < len(self.source):
             self.position += 1
             self.column += 1
     
     def add_token(self, token_type: TokenType, value: str):
-        """Add a token to the token list"""
+        """Prida token do seznamu"""
         token = Token(token_type, value, self.line, self.column)
         self.tokens.append(token)
-
-if __name__ == "__main__":
-    # Test the lexer
-    test_code = """
-    MODULE Test;
-    VAR x: INTEGER;
-    BEGIN
-        x := 42;
-    END Test.
-    """
-    
-    lexer = Lexer(test_code)
-    tokens = lexer.tokenize()
-    
-    for token in tokens:
-        print(token)

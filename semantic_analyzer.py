@@ -1,18 +1,14 @@
-"""
-Semantic analyzer for Oberon subset compiler
-Performs type checking and variable validation
-"""
-
 from typing import Dict, List, Optional, Set
-from ast import *
+from oberon_ast import *
 from lexer import TokenType
 
 class Symbol:
-    def __init__(self, name: str, type_: DataType, is_constant: bool = False, value: Optional[Union[int, float, str]] = None):
+    def __init__(self, name: str, type_: DataType, is_constant: bool = False, value: Optional[Union[int, float, str]] = None, array_dimensions: Optional[List[int]] = None):
         self.name = name
         self.type = type_
         self.is_constant = is_constant
         self.value = value
+        self.array_dimensions = array_dimensions
 
 class Scope:
     def __init__(self, parent: Optional['Scope'] = None):
@@ -20,13 +16,13 @@ class Scope:
         self.parent = parent
     
     def define(self, symbol: Symbol):
-        """Define a symbol in this scope"""
+        """Definuje symbol v tomto scope"""
         if symbol.name in self.symbols:
             raise NameError(f"Symbol '{symbol.name}' already defined in this scope")
         self.symbols[symbol.name] = symbol
     
     def lookup(self, name: str) -> Optional[Symbol]:
-        """Look up a symbol in this scope and parent scopes"""
+        """Hleda symbol v tomto scope a parent scopes"""
         if name in self.symbols:
             return self.symbols[name]
         if self.parent:
@@ -42,18 +38,15 @@ class SemanticAnalyzer:
         self._add_builtin_procedures()
     
     def _add_builtin_procedures(self):
-        """Add built-in procedures to the procedure table"""
-        # Write procedure - takes any number of arguments
+        """Prida vestavene procedury"""
         write_proc = ProcedureDeclaration("Write", [], None, [], [])
         self.procedures["Write"] = write_proc
         
-        # WriteLn procedure - no arguments
         writeln_proc = ProcedureDeclaration("WriteLn", [], None, [], [])
         self.procedures["WriteLn"] = writeln_proc
     
     def analyze(self, program: Program) -> List[str]:
-        """Perform semantic analysis on the program"""
-        # Reset state for each new analysis
+        """Provadi semantickou analyzu programu"""
         self.errors.clear()
         self.global_scope = Scope()
         self.current_scope = self.global_scope
@@ -61,14 +54,16 @@ class SemanticAnalyzer:
         self._add_builtin_procedures()
         
         try:
-            # Analyze declarations
+            for declaration in program.declarations:
+                if isinstance(declaration, ProcedureDeclaration):
+                    self.procedures[declaration.name] = declaration
+            
             for declaration in program.declarations:
                 self.analyze_declaration(declaration)
             
-            # Analyze statements
             for statement in program.statements:
                 self.analyze_statement(statement)
-            
+        
         except Exception as e:
             self.errors.append(f"Semantic error: {e}")
         
@@ -96,16 +91,12 @@ class SemanticAnalyzer:
         self.current_scope.define(symbol)
     
     def analyze_var_declaration(self, declaration: VarDeclaration):
-        """Analyze a variable declaration"""
-        # Determine the actual type
-        if declaration.array_dimensions is not None:
-            # This is an array declaration (může být vícerozměrné)
-            symbol_type = DataType.ARRAY
-        else:
-            # This is a simple variable
-            symbol_type = declaration.type
-        
-        symbol = Symbol(declaration.name, symbol_type, is_constant=False)
+        symbol = Symbol(
+            declaration.name,
+            declaration.type,
+            is_constant=False,
+            array_dimensions=declaration.array_dimensions
+        )
         self.current_scope.define(symbol)
     
     def analyze_procedure_declaration(self, declaration: ProcedureDeclaration):
@@ -119,7 +110,12 @@ class SemanticAnalyzer:
         
         # Analyze parameters
         for parameter in declaration.parameters:
-            symbol = Symbol(parameter.name, parameter.type, is_constant=False)
+            symbol = Symbol(
+                parameter.name, 
+                parameter.type, 
+                is_constant=False,
+                array_dimensions=parameter.array_dimensions
+            )
             self.current_scope.define(symbol)
         
         # Analyze local declarations
@@ -139,6 +135,8 @@ class SemanticAnalyzer:
             self.analyze_assignment(statement)
         elif isinstance(statement, ProcedureCall):
             self.analyze_procedure_call(statement)
+        elif isinstance(statement, ReturnStatement):
+            self.analyze_return_statement(statement)
         elif isinstance(statement, IfStatement):
             self.analyze_if_statement(statement)
         elif isinstance(statement, WhileStatement):
@@ -182,8 +180,12 @@ class SemanticAnalyzer:
                 raise NameError(f"Cannot assign to constant array '{assignment.variable.name}'")
             
             # Check that it's an array
-            if symbol.type != DataType.ARRAY:
+            if symbol.array_dimensions is None:
                 raise TypeError(f"'{assignment.variable.name}' is not an array")
+            
+            # Check number of indices
+            if len(assignment.variable.indices) != len(symbol.array_dimensions):
+                raise TypeError(f"Array '{assignment.variable.name}' has {len(symbol.array_dimensions)} dimensions, but {len(assignment.variable.indices)} indices provided")
             
             # Analyze index expressions (může jich být více pro vícerozměrná pole)
             for idx_expr in assignment.variable.indices:
@@ -194,8 +196,9 @@ class SemanticAnalyzer:
             # Analyze expression type
             expression_type = self.analyze_expression(assignment.expression)
             
-            # Check type compatibility (for now, assume array elements can be assigned any type)
-            # In a more sophisticated implementation, you'd track the array element type
+            # Check type compatibility - expression type must match array element type
+            if expression_type != symbol.type:
+                raise TypeError(f"Cannot assign {expression_type.value} to array element of type {symbol.type.value}")
         
         else:
             raise TypeError(f"Invalid assignment target: {type(assignment.variable)}")
@@ -233,6 +236,13 @@ class SemanticAnalyzer:
         self.analyze_statement(statement.then_statement)
         if statement.else_statement:
             self.analyze_statement(statement.else_statement)
+    
+    def analyze_return_statement(self, statement: ReturnStatement):
+        """Analyze a return statement"""
+        if statement.expression:
+            expression_type = self.analyze_expression(statement.expression)
+            # Just validate the expression type, don't enforce return type here
+            # (that would be done in procedure context)
     
     def analyze_while_statement(self, statement: WhileStatement):
         """Analyze a while statement"""
@@ -288,12 +298,21 @@ class SemanticAnalyzer:
                 if not symbol:
                     raise NameError(f"Array '{expression.name}' not defined")
             
+            # Verify it's actually an array
+            if symbol.array_dimensions is None:
+                raise TypeError(f"'{expression.name}' is not an array")
+            
+            # Check number of indices matches array dimensions
+            if len(expression.indices) != len(symbol.array_dimensions):
+                raise TypeError(f"Array '{expression.name}' has {len(symbol.array_dimensions)} dimensions, but {len(expression.indices)} indices provided")
+            
             # Kontrola všech indexů (může jich být více pro vícerozměrná pole)
             for idx_expr in expression.indices:
                 index_type = self.analyze_expression(idx_expr)
                 if index_type != DataType.INTEGER:
                     raise TypeError("Array index must be integer")
             
+            # Return the ELEMENT type, not the ARRAY type
             return symbol.type
         
         elif isinstance(expression, FunctionCall):

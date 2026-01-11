@@ -1,11 +1,16 @@
 from typing import Dict, List, Optional, Union, Any
-from ast import *
+from oberon_ast import *
 from semantic_analyzer import Scope, Symbol
 
 class RuntimeValue:
     def __init__(self, value: Union[int, float, str, List[Any]], type_: DataType):
         self.value = value
         self.type = type_
+
+class ReturnException(Exception):
+    """Exception used to implement return statement"""
+    def __init__(self, value: Optional[RuntimeValue] = None):
+        self.value = value
 
 class Interpreter:
     def __init__(self):
@@ -24,20 +29,37 @@ class Interpreter:
                 self.procedures[declaration.name] = declaration
             elif isinstance(declaration, VarDeclaration):
                 # Initialize variable with default value
-                if declaration.array_size is not None:
-                    # Initialize array
+                if declaration.array_dimensions is not None:
+                    # Initialize multidimensional array (flattened to 1D list)
+                    # Calculate total size
+                    total_size = 1
+                    for dim in declaration.array_dimensions:
+                        total_size *= dim
+                    
+                    if declaration.type == DataType.INTEGER:
+                        array_values = [0] * total_size
+                    elif declaration.type == DataType.REAL:
+                        array_values = [0.0] * total_size
+                    elif declaration.type == DataType.STRING:
+                        array_values = [""] * total_size
+                    else:
+                        array_values = [0] * total_size
+                    
+                    default_value = RuntimeValue(array_values, declaration.type)
+                    # Store dimensions for later index calculation
+                    default_value.array_dimensions = declaration.array_dimensions
+                elif hasattr(declaration, 'array_size') and declaration.array_size is not None:
+                    # Backward compatibility with old code that uses array_size
                     if declaration.type == DataType.INTEGER:
                         array_values = [0] * declaration.array_size
-                        default_value = RuntimeValue(array_values, DataType.ARRAY)
                     elif declaration.type == DataType.REAL:
                         array_values = [0.0] * declaration.array_size
-                        default_value = RuntimeValue(array_values, DataType.ARRAY)
                     elif declaration.type == DataType.STRING:
                         array_values = [""] * declaration.array_size
-                        default_value = RuntimeValue(array_values, DataType.ARRAY)
                     else:
                         array_values = [0] * declaration.array_size
-                        default_value = RuntimeValue(array_values, DataType.ARRAY)
+                    
+                    default_value = RuntimeValue(array_values, declaration.type)
                 else:
                     if declaration.type == DataType.INTEGER:
                         default_value = RuntimeValue(0, DataType.INTEGER)
@@ -62,6 +84,11 @@ class Interpreter:
             self.execute_assignment(statement)
         elif isinstance(statement, ProcedureCall):
             self.execute_procedure_call(statement)
+        elif isinstance(statement, ReturnStatement):
+            value = None
+            if statement.expression:
+                value = self.evaluate_expression(statement.expression)
+            raise ReturnException(value)
         elif isinstance(statement, IfStatement):
             self.execute_if_statement(statement)
         elif isinstance(statement, WhileStatement):
@@ -115,16 +142,64 @@ class Interpreter:
         old_scope = self.current_scope
         self.current_scope = Scope(old_scope)
         
+        # Register nested procedures
+        for declaration in procedure.declarations:
+            if isinstance(declaration, ProcedureDeclaration):
+                self.procedures[declaration.name] = declaration
+        
+        # Initialize local variables
+        for declaration in procedure.declarations:
+            if isinstance(declaration, VarDeclaration):
+                if declaration.array_dimensions is not None:
+                    # Initialize array
+                    total_size = 1
+                    for dim in declaration.array_dimensions:
+                        total_size *= dim
+                    
+                    if declaration.type == DataType.INTEGER:
+                        array_values = [0] * total_size
+                    elif declaration.type == DataType.REAL:
+                        array_values = [0.0] * total_size
+                    elif declaration.type == DataType.STRING:
+                        array_values = [""] * total_size
+                    else:
+                        array_values = [0] * total_size
+                    
+                    default_value = RuntimeValue(array_values, declaration.type)
+                    default_value.array_dimensions = declaration.array_dimensions
+                else:
+                    if declaration.type == DataType.INTEGER:
+                        default_value = RuntimeValue(0, DataType.INTEGER)
+                    elif declaration.type == DataType.REAL:
+                        default_value = RuntimeValue(0.0, DataType.REAL)
+                    elif declaration.type == DataType.STRING:
+                        default_value = RuntimeValue("", DataType.STRING)
+                    else:
+                        default_value = RuntimeValue(0, DataType.INTEGER)
+                
+                symbol = Symbol(declaration.name, declaration.type, is_constant=False)
+                self.current_scope.define(symbol)
+                self.set_variable(declaration.name, default_value)
+        
         # Set up parameters
         for i, (arg, param) in enumerate(zip(call.arguments, procedure.parameters)):
             value = self.evaluate_expression(arg)
-            symbol = Symbol(param.name, param.type, is_constant=False)
+            symbol = Symbol(
+                param.name, 
+                param.type, 
+                is_constant=False,
+                array_dimensions=param.array_dimensions
+            )
             self.current_scope.define(symbol)
             self.set_variable(param.name, value)
         
         # Execute procedure body
-        for statement in procedure.statements:
-            self.execute_statement(statement)
+        try:
+            for statement in procedure.statements:
+                self.execute_statement(statement)
+        except ReturnException:
+            # Procedures can also have return statements (for early exit)
+            pass
         
         # Restore scope
         self.current_scope = old_scope
@@ -178,18 +253,46 @@ class Interpreter:
         
         elif isinstance(expression, ArrayAccess):
             array = self.get_variable(expression.name)
-            index = self.evaluate_expression(expression.index)
-            
-            if not isinstance(index.value, int):
-                raise TypeError("Array index must be integer")
             
             if not isinstance(array.value, list):
                 raise TypeError(f"'{expression.name}' is not an array")
             
-            if index.value < 0 or index.value >= len(array.value):
-                raise IndexError(f"Array index {index.value} out of bounds")
+            # Handle multidimensional arrays
+            indices = []
+            for idx_expr in expression.indices:
+                idx = self.evaluate_expression(idx_expr)
+                if not isinstance(idx.value, int):
+                    raise TypeError("Array index must be integer")
+                indices.append(idx.value)
             
-            return RuntimeValue(array.value[index.value], array.type)
+            # Calculate flat index for multidimensional arrays
+            if len(indices) == 1:
+                # 1D array
+                flat_index = indices[0]
+            else:
+                # Multidimensional array: convert [i0, i1, i2, ...] to flat index
+                # using row-major order: flat = i0*d1*d2*... + i1*d2*... + i2*... + ...
+                flat_index = 0
+                multiplier = 1
+                
+                # Get dimensions from array or assume they match indices
+                if hasattr(array, 'array_dimensions'):
+                    dimensions = array.array_dimensions
+                else:
+                    # Fallback: assume dimensions from AST
+                    # This shouldn't happen if interpreter is used correctly
+                    dimensions = [1] * len(indices)
+                
+                # Calculate flat index in row-major order
+                for i in range(len(indices) - 1, -1, -1):
+                    flat_index += indices[i] * multiplier
+                    if i > 0:
+                        multiplier *= dimensions[i]
+            
+            if flat_index < 0 or flat_index >= len(array.value):
+                raise IndexError(f"Array index {flat_index} out of bounds (array size: {len(array.value)})")
+            
+            return RuntimeValue(array.value[flat_index], array.type)
         
         elif isinstance(expression, FunctionCall):
             if expression.name in self.procedures:
@@ -204,18 +307,22 @@ class Interpreter:
                 # Set up parameters
                 for i, (arg, param) in enumerate(zip(expression.arguments, procedure.parameters)):
                     value = self.evaluate_expression(arg)
-                    symbol = Symbol(param.name, param.type, is_constant=False)
+                    symbol = Symbol(
+                        param.name, 
+                        param.type, 
+                        is_constant=False,
+                        array_dimensions=param.array_dimensions
+                    )
                     self.current_scope.define(symbol)
                     self.set_variable(param.name, value)
                 
                 # Execute function body and collect return value
-                # For simplicity, we'll assume the last statement is a return
-                # In a real implementation, you'd need proper return handling
                 result = None
-                for statement in procedure.statements:
-                    if isinstance(statement, Assignment) and statement.variable == "result":
-                        result = self.evaluate_expression(statement.expression)
-                        break
+                try:
+                    for statement in procedure.statements:
+                        self.execute_statement(statement)
+                except ReturnException as e:
+                    result = e.value
                 
                 # Restore scope
                 self.current_scope = old_scope
@@ -338,19 +445,44 @@ class Interpreter:
     def set_array_element(self, array_access: ArrayAccess, value: RuntimeValue):
         """Set an array element's value"""
         array = self.get_variable(array_access.name)
-        index = self.evaluate_expression(array_access.index)
-        
-        if not isinstance(index.value, int):
-            raise TypeError("Array index must be integer")
         
         if not isinstance(array.value, list):
             raise TypeError(f"'{array_access.name}' is not an array")
         
-        if index.value < 0 or index.value >= len(array.value):
-            raise IndexError(f"Array index {index.value} out of bounds")
+        # Handle multidimensional arrays
+        indices = []
+        for idx_expr in array_access.indices:
+            idx = self.evaluate_expression(idx_expr)
+            if not isinstance(idx.value, int):
+                raise TypeError("Array index must be integer")
+            indices.append(idx.value)
+        
+        # Calculate flat index for multidimensional arrays
+        if len(indices) == 1:
+            # 1D array
+            flat_index = indices[0]
+        else:
+            # Multidimensional array: convert [i0, i1, i2, ...] to flat index
+            flat_index = 0
+            multiplier = 1
+            
+            # Get dimensions from array
+            if hasattr(array, 'array_dimensions'):
+                dimensions = array.array_dimensions
+            else:
+                dimensions = [1] * len(indices)
+            
+            # Calculate flat index in row-major order
+            for i in range(len(indices) - 1, -1, -1):
+                flat_index += indices[i] * multiplier
+                if i > 0:
+                    multiplier *= dimensions[i]
+        
+        if flat_index < 0 or flat_index >= len(array.value):
+            raise IndexError(f"Array index {flat_index} out of bounds")
         
         # Update the array element
-        array.value[index.value] = value.value
+        array.value[flat_index] = value.value
 
 if __name__ == "__main__":
     # Test the interpreter

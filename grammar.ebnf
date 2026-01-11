@@ -1,4 +1,8 @@
-(* Oberon Subset Grammar - EBNF *)
+# Oberon Subset Grammar - TatSu EBNF
+#
+# This grammar describes a subset of the Oberon programming language.
+# It is compatible with TatSu parser generator syntax.
+# See: https://tatsu.readthedocs.io/en/stable/syntax.html
 
 program = "MODULE" identifier ";" { declaration } "BEGIN" { statement } "END" identifier "." ;
 
@@ -8,18 +12,28 @@ constDeclaration = "CONST" { identifier "=" expression ";" } ;
 
 varDeclaration = "VAR" { identifier ":" type ";" } ;
 
-procedureDeclaration = "PROCEDURE" identifier [ "(" [ formalParameters ] ")" ] ":" type ";" { declaration } "BEGIN" { statement | procedureDeclaration } "END" identifier ";" ;
+procedureDeclaration = "PROCEDURE" identifier [ "(" [ formalParameters ] ")" ] [ ":" simpleType ] ";" { declaration } "BEGIN" { statement } "END" identifier ";" ;
 
 formalParameters = fpSection { ";" fpSection } ;
 fpSection = [ "VAR" ] identifier { "," identifier } ":" type ;
 
-type = "INTEGER" | "REAL" | "STRING" | "ARRAY" "[" expression "]" "OF" type ;
+type = simpleType | arrayType ;
+
+simpleType = "INTEGER" | "REAL" | "STRING" ;
+
+arrayType = "ARRAY" [ "[" ] dimensions "]" "OF" simpleType ;
+
+dimensions = integer { "," integer } ;
 
 statement = assignment | procedureCall | ifStatement | whileStatement | forStatement | compoundStatement ;
 
-assignment = identifier ":=" expression ;
+assignment = ( identifier [ "[" indexList "]" ] ":=" expression ) | procedureCall ;
 
-procedureCall = identifier [ "(" [ expression { "," expression } ] ")" ] ;
+indexList = expression { "," expression } ;
+
+procedureCall = identifier [ "(" [ expressionList ] ")" ] ;
+
+expressionList = expression { "," expression } ;
 
 ifStatement = "IF" expression "THEN" statement [ "ELSE" statement ] "END" ;
 
@@ -31,11 +45,13 @@ compoundStatement = "BEGIN" { statement } "END" ;
 
 expression = simpleExpression [ relation simpleExpression ] ;
 
-simpleExpression = [ "+" | "-" ] term { addOperator term } ;
+simpleExpression = [ addOperator ] term { addOperator term } ;
 
 term = factor { mulOperator factor } ;
 
-factor = number | string | identifier | "(" expression ")" | procedureCall ;
+factor = number | string | primaryExpression ;
+
+primaryExpression = identifier [ "[" indexList "]" | "(" [ expressionList ] ")" ] | "(" expression ")" ;
 
 relation = "=" | "#" | "<" | "<=" | ">" | ">=" ;
 
@@ -43,18 +59,12 @@ addOperator = "+" | "-" | "OR" ;
 
 mulOperator = "*" | "/" | "DIV" | "MOD" | "AND" ;
 
-number = integer | real ;
+number = real | integer ;
 
-integer = digit { digit } ;
+integer = /\d+/ ;
 
-real = digit { digit } "." digit { digit } ;
+real = /\d+\.\d+/ ;
 
-string = '"' { character } '"' ;
+string = /"(?:[^"\\]|\\.)*"/ ;
 
-identifier = letter { letter | digit } ;
-
-letter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
-
-digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
-
-character = letter | digit | " " | "!" | "#" | "$" | "%" | "&" | "'" | "(" | ")" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "]" | "^" | "_" | "`" | "{" | "|" | "}" | "~" ;
+identifier = /[a-zA-Z_]\w*/ ;

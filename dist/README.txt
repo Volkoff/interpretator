@@ -10,7 +10,7 @@ Co obsahuje:
 
 Rychlý start:
 
-- Spustit GUI (doporučeno):
+- Spustit GUI (doporučeno, přes cmd):
 
 ```
 oberon.exe -g
@@ -64,5 +64,6 @@ Poznámka:
 
 Složka `examples/` zůstává v distribučním balíku; v tomto souboru nejsou uvedeny jednotlivé příklady.
 
-Verze: leden 2026
+GIT REPO:
+https://github.com/Volkoff/interpretator.git
 

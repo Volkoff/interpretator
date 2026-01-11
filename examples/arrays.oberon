@@ -1,8 +1,8 @@
 MODULE Arrays;
-VAR numbers: ARRAY[5] OF INTEGER;
+VAR numbers: ARRAY 5 OF INTEGER;
     i, sum: INTEGER;
 
-PROCEDURE PrintArray(arr: ARRAY[5] OF INTEGER);
+PROCEDURE PrintArray(arr: ARRAY 5 OF INTEGER);
 VAR j: INTEGER;
 BEGIN
     Write("Array elements: ");

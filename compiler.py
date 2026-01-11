@@ -18,12 +18,7 @@ class Compiler:
         self.semantic_analyzer = SemanticAnalyzer()
 
     def compile_file(self, filename: str, build_native: bool = True) -> (List[str], str):
-        """
-        Compiles a source file to LLVM IR and optionally to a native executable.
-        Returns a tuple containing:
-        - A list of status/error messages.
-        - The path to the final executable (or an empty string if build fails).
-        """
+        """Kompiluje zdrojovy soubor na LLVM IR"""
         try:
             with open(filename, 'r', encoding='utf-8') as f:
                 source = f.read()
@@ -35,14 +30,8 @@ class Compiler:
             return [f"Error reading file: {e}"], ""
 
     def compile_source(self, source: str, source_filename: str = 'program', build_native: bool = True) -> (List[str], str):
-        """
-        Compiles source code to LLVM IR and optionally to a native executable.
-        Returns a tuple containing:
-        - A list of status/error messages.
-        - The path to the final executable (or an empty string if build fails).
-        """
+        """Kompiluje zdrojovy kod na LLVM IR a pripadne na nativni spustitelny kod"""
         try:
-            # --- Fáze 1: Frontend (Lexer, Parser, Sémantická analýza) ---
             lexer = Lexer(source)
             tokens = lexer.tokenize()
             parser = Parser(tokens)
@@ -53,7 +42,6 @@ class Compiler:
             if errors:
                 return [f"Semantic error: {err}" for err in errors], ""
 
-            # --- Fáze 2: Backend (Generování LLVM IR) ---
             emitter = LLVMEmitter()
             ll_code = emitter.emit_program(ast)
             ll_filename = source_filename + '.ll'
@@ -66,11 +54,17 @@ class Compiler:
             if not build_native:
                 return [f"Wrote LLVM IR to {ll_filename}"], ""
 
-            # --- Fáze 3: Generování nativního kódu pomocí Clang ---
             clang_path = shutil.which('clang') or shutil.which('clang.exe')
             if not clang_path:
-                msg = f"Wrote LLVM IR to {ll_filename}. 'clang' not found in PATH. Cannot produce native executable."
-                return [msg], ""
+                msg = f"Wrote LLVM IR to {ll_filename}.\n'clang' not found in PATH.\nFalling back to Python interpreter mode."
+                
+                from interpreter import Interpreter
+                try:
+                    interpreter = Interpreter()
+                    output = interpreter.interpret(ast)
+                    return [msg, "Program executed successfully in interpreter mode"] + output, ""
+                except Exception as e:
+                    return [msg, f"Interpreter error: {e}"], ""
 
             exe_filename = source_filename + ('.exe' if os.name == 'nt' else '')
             try:
@@ -80,7 +74,15 @@ class Compiler:
                 )
                 if proc.returncode != 0:
                     error_msg = f"Clang error: {proc.stderr.strip()}"
-                    return [f"LLVM IR written to {ll_filename}", error_msg], ""
+                    fallback_msg = "Falling back to Python interpreter mode..."
+                    
+                    from interpreter import Interpreter
+                    try:
+                        interpreter = Interpreter()
+                        output = interpreter.interpret(ast)
+                        return [f"LLVM IR written to {ll_filename}", error_msg, fallback_msg, "Program executed successfully in interpreter mode"] + output, ""
+                    except Exception as e:
+                        return [f"LLVM IR written to {ll_filename}", error_msg, fallback_msg, f"Interpreter error: {e}"], ""
                 
                 success_msg = f"Successfully created executable: {exe_filename}"
                 return [f"Wrote LLVM IR to {ll_filename}", success_msg], exe_filename
@@ -94,7 +96,7 @@ class Compiler:
 
 
 def main():
-    """Main entry point for the command-line compiler."""
+    """Hlavni bod vstupu pro kompajler z prikazove radky"""
     parser = argparse.ArgumentParser(description='Compile Oberon source to a native executable.')
     parser.add_argument('source', help='Source file to compile.')
     parser.add_argument('-o', '--output', help='Output executable name.')
@@ -102,7 +104,6 @@ def main():
 
     compiler = Compiler()
     
-    # Zkompiluje soubor a vytvoří nativní kód
     messages, exe_path = compiler.compile_file(args.source, build_native=True)
 
     for msg in messages:

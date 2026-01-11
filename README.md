@@ -1,53 +1,333 @@
-# Oberon Subset Compiler
+# Oberon Compiler - User Guide
 
-A compiler for a subset of the Oberon programming language, implemented in Python. This compiler demonstrates the key components of a compiler: lexical analysis, parsing, semantic analysis, and interpretation.
+A complete compiler for a subset of the Oberon programming language, implemented in Python.
 
-## Features
+## Quick Start
 
-### Supported Language Features
-
-- **Data Types**: INTEGER, REAL, STRING, and arrays
-- **Variables**: Global and local variable declarations
-- **Constants**: Constant declarations with values
-- **Procedures and Functions**: User-defined procedures with parameters and return values
-- **Control Structures**: IF-THEN-ELSE, WHILE loops, FOR loops
-- **Expressions**: Arithmetic, relational, and logical operations
-- **Arrays**: One-dimensional arrays with integer indexing
-- **Built-in Procedures**: Write, WriteLn for output
-
-### Compiler Components
-
-1. **Lexer** (`lexer.py`): Tokenizes source code into tokens
-2. **Parser** (`parser.py`): Builds Abstract Syntax Tree (AST) from tokens
-3. **Semantic Analyzer** (`semantic_analyzer.py`): Performs type checking and variable validation
-4. **Interpreter** (`interpreter.py`): Executes the AST and produces output
-5. **Main Compiler** (`compiler.py`): Coordinates all components
-
-## Grammar
-
-The language follows this EBNF grammar (see `grammar.ebnf`):
-
-```
-program = "MODULE" identifier ";" { declaration } "BEGIN" { statement } "END" identifier "." ;
-```
-
-## Usage
-
-### Running the Compiler
+### Running an Oberon Program
 
 ```bash
-python compiler.py <source_file>
+python oberon.py examples/hello_world.oberon
 ```
 
-### Example Programs
+### Compiling to LLVM IR
 
-The `examples/` directory contains several example programs:
+```bash
+python oberon.py examples/hello_world.oberon -c
+```
 
-1. **hello_world.oberon**: Basic "Hello, World!" program
-2. **arithmetic.oberon**: Demonstrates arithmetic operations
-3. **control_structures.oberon**: Shows IF, WHILE, and FOR statements
-4. **procedures.oberon**: Demonstrates procedure definitions and calls
-5. **arrays.oberon**: Shows array usage and procedures with arrays
+This creates a `.ll` file (LLVM Intermediate Representation) in the same directory.
+
+## Supported Features
+
+### Data Types
+- `INTEGER` - 32-bit signed integers
+- `REAL` - Floating-point numbers
+- `STRING` - Text strings
+- `ARRAY` - One-dimensional and multi-dimensional arrays
+
+### Program Structure
+```oberon
+MODULE ProgramName;
+  VAR x: INTEGER;
+BEGIN
+  x := 42;
+  Write(x);
+END ProgramName.
+```
+
+### Variables and Constants
+```oberon
+MODULE Example;
+  CONST MAX = 100;
+  VAR count: INTEGER;
+BEGIN
+  count := MAX;
+END Example.
+```
+
+### Procedures and Functions
+```oberon
+PROCEDURE Add(a, b: INTEGER): INTEGER;
+BEGIN
+  RETURN a + b;
+END Add;
+```
+
+### Control Structures
+- **IF-THEN-ELSE**
+- **WHILE loops**
+- **FOR loops**
+
+### Arrays
+```oberon
+VAR arr: ARRAY 10 OF INTEGER;
+BEGIN
+  arr[0] := 42;
+  Write(arr[0]);
+END.
+```
+
+### Multi-dimensional Arrays
+```oberon
+VAR matrix: ARRAY 3, 3 OF INTEGER;
+BEGIN
+  matrix[0, 1] := 5;
+END.
+```
+
+## Example Programs
+
+All examples are in the `examples/` directory:
+
+| File | Description |
+|------|-------------|
+| `hello_world.oberon` | Basic output program |
+| `arithmetic.oberon` | Integer and real arithmetic |
+| `control_structures.oberon` | IF, WHILE, FOR statements |
+| `procedures.oberon` | Procedure definitions and calls |
+| `simple_procedures.oberon` | Basic procedure example |
+| `arrays.oberon` | Single-dimensional arrays |
+| `arrays_2d.oberon` | Two-dimensional arrays |
+| `multidimensional_arrays.oberon` | N-dimensional arrays |
+| `simple_arrays.oberon` | Array basics |
+| `types_conversions.oberon` | Type handling |
+| `indirect_recursion.oberon` | Mutual recursion (even/odd) |
+| `nested_procedures.oberon` | Procedures within procedures |
+
+## Usage Examples
+
+### Run hello_world.oberon
+```bash
+python oberon.py examples/hello_world.oberon
+```
+
+Output:
+```
+Hello, World!
+```
+
+### Compile arithmetic.oberon to LLVM IR
+```bash
+python oberon.py examples/arithmetic.oberon -c
+```
+
+Creates: `examples/arithmetic.ll`
+
+### Run with your own Oberon file
+```bash
+python oberon.py my_program.oberon
+```
+
+## Compiler Architecture
+
+### 1. Lexer (`lexer.py`)
+Converts source code characters into tokens:
+```
+"x := 42;" → IDENTIFIER('x') ASSIGN INTEGER_LITERAL('42') SEMICOLON
+```
+
+### 2. Parser (`parser.py`)
+Builds Abstract Syntax Tree (AST) from tokens using recursive descent parsing
+
+### 3. Semantic Analyzer (`semantic_analyzer.py`)
+- Validates variable declarations
+- Checks types
+- Manages symbol tables and scopes
+- Ensures no undefined variables
+
+### 4. Interpreter (`interpreter.py`)
+Directly executes the AST to produce output
+
+### 5. LLVM Emitter (`emitter.py`)
+Generates LLVM Intermediate Representation for potential native compilation
+
+## System Requirements
+
+- **Python 3.10+**
+- No external dependencies required for interpreter mode
+- (Optional) **Clang** for native executable generation
+
+## Command Reference
+
+### oberon.py
+```
+Usage: python oberon.py <source_file> [options]
+
+Options:
+  -c         Compile to LLVM IR only (creates .ll file)
+  -h         Show help message
+
+Examples:
+  python oberon.py program.oberon      # Run in interpreter mode
+  python oberon.py program.oberon -c   # Compile to LLVM IR
+```
+
+## Language Syntax
+
+### Program Structure
+```oberon
+MODULE ModuleName;
+  CONST constant = value;
+  VAR variable: TYPE;
+  
+  PROCEDURE SubroutineName;
+  BEGIN
+    (* procedure body *)
+  END SubroutineName;
+  
+BEGIN
+  (* main program *)
+END ModuleName.
+```
+
+### Variables
+```oberon
+VAR x, y: INTEGER;
+VAR name: STRING;
+VAR values: ARRAY 5 OF INTEGER;
+```
+
+### Types
+- `INTEGER` - whole numbers
+- `REAL` - decimals
+- `STRING` - text
+- `ARRAY n OF TYPE` - arrays with n elements
+
+### Operators
+- Arithmetic: `+`, `-`, `*`, `/`, `DIV`, `MOD`
+- Relational: `=`, `#` (not equal), `<`, `>`, `<=`, `>=`
+- Logical: `AND`, `OR`
+
+### Built-in Procedures
+- `Write(value)` - Output a value
+- `WriteLn()` - Output newline
+
+## Example Programs
+
+### Hello World
+```oberon
+MODULE HelloWorld;
+BEGIN
+  Write("Hello, World!");
+  WriteLn();
+END HelloWorld.
+```
+
+### Factorial (Recursive)
+```oberon
+MODULE Factorial;
+  
+  PROCEDURE Factorial(n: INTEGER): INTEGER;
+  BEGIN
+    IF n <= 1 THEN
+      RETURN 1;
+    ELSE
+      RETURN n * Factorial(n - 1);
+    END;
+  END Factorial;
+  
+BEGIN
+  Write(Factorial(5));
+  WriteLn();
+END Factorial.
+```
+
+### Loop Example
+```oberon
+MODULE Loops;
+  VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    Write(i);
+    Write(" ");
+  END;
+  WriteLn();
+END Loops.
+```
+
+### Array Example
+```oberon
+MODULE Arrays;
+  VAR arr: ARRAY 5 OF INTEGER;
+      i: INTEGER;
+BEGIN
+  FOR i := 0 TO 4 DO
+    arr[i] := i * 2;
+  END;
+  
+  FOR i := 0 TO 4 DO
+    Write(arr[i]);
+    Write(" ");
+  END;
+  WriteLn();
+END Arrays.
+```
+
+## Project Files
+
+- `oberon.py` - Main executable wrapper
+- `compiler.py` - Compilation orchestrator
+- `lexer.py` - Lexical analyzer
+- `parser.py` - Parser
+- `semantic_analyzer.py` - Type checker and validator
+- `interpreter.py` - AST interpreter
+- `emitter.py` - LLVM IR generator
+- `oberon_ast.py` - AST node definitions
+- `gui.py` - GUI IDE (optional)
+- `grammar.ebnf` - Formal language grammar
+- `examples/` - Sample programs
+
+## Execution Flow
+
+```
+Source Code (.oberon)
+        ↓
+    Lexer
+        ↓
+   Tokens
+        ↓
+    Parser
+        ↓
+      AST
+        ↓
+Semantic Analyzer
+        ↓
+   Validated AST
+        ↓
+   Interpreter / Emitter
+        ↓
+  Output / LLVM IR
+```
+
+## Testing
+
+All 12 example programs pass comprehensive testing:
+- ✅ hello_world.oberon
+- ✅ arithmetic.oberon
+- ✅ arrays.oberon
+- ✅ arrays_2d.oberon
+- ✅ control_structures.oberon
+- ✅ indirect_recursion.oberon
+- ✅ multidimensional_arrays.oberon
+- ✅ nested_procedures.oberon
+- ✅ procedures.oberon
+- ✅ simple_arrays.oberon
+- ✅ simple_procedures.oberon
+- ✅ types_conversions.oberon
+
+## GUI IDE
+
+Run the graphical IDE:
+```bash
+python gui.py
+```
+
+Features:
+- Syntax highlighting
+- Real-time compilation
+- Output display
+- File management
 
 ### Running Examples
 

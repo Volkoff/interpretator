@@ -1,5 +1,5 @@
 from typing import List, Dict, Tuple, Optional
-from ast import *
+from oberon_ast import *
 
 
 class LLVMEmitter:

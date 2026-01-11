@@ -1,11 +1,6 @@
-"""
-Parser for Oberon subset compiler
-Builds AST from tokens
-"""
-
 from typing import List, Optional
 from lexer import Lexer, Token, TokenType
-from ast import *
+from oberon_ast import *
 
 class Parser:
     def __init__(self, tokens: List[Token]):
@@ -175,25 +170,36 @@ class Parser:
         
         self.expect(TokenType.COLON)
         
+        array_dimensions = None
         if self.current_token.type == TokenType.ARRAY:
             self.advance()
+            # Parse array dimensions: ARRAY size1[, size2, ...] OF type
+            dimensions = []
+            
             # Support both syntaxes: ARRAY[size] and ARRAY size
             if self.current_token.type == TokenType.LBRACKET:
                 self.advance()
-                size = int(self.expect(TokenType.INTEGER_LITERAL).value)
+                dimensions.append(int(self.expect(TokenType.INTEGER_LITERAL).value))
+                while self.current_token.type == TokenType.COMMA:
+                    self.advance()
+                    dimensions.append(int(self.expect(TokenType.INTEGER_LITERAL).value))
                 self.expect(TokenType.RBRACKET)
             else:
-                size = int(self.expect(TokenType.INTEGER_LITERAL).value)
+                dimensions.append(int(self.expect(TokenType.INTEGER_LITERAL).value))
+                while self.current_token.type == TokenType.COMMA:
+                    self.advance()
+                    dimensions.append(int(self.expect(TokenType.INTEGER_LITERAL).value))
+            
             self.expect(TokenType.OF)
             type_token = self.expect(TokenType.INTEGER, TokenType.REAL, TokenType.STRING)
             type_ = DataType(type_token.value)
-            # For simplicity, we'll treat arrays as the base type
+            array_dimensions = dimensions
         else:
             type_token = self.expect(TokenType.INTEGER, TokenType.REAL, TokenType.STRING)
             type_ = DataType(type_token.value)
         
         for name in names:
-            parameters.append(Parameter(name, type_, is_reference))
+            parameters.append(Parameter(name, type_, is_reference, array_dimensions))
         
         if self.current_token.type == TokenType.SEMICOLON:
             self.advance()
@@ -203,7 +209,15 @@ class Parser:
     
     def parse_statement(self) -> Statement:
         """Parse a statement"""
-        if self.current_token.type == TokenType.IDENTIFIER:
+        if self.current_token.type == TokenType.RETURN:
+            self.advance()
+            expression = None
+            if self.current_token.type != TokenType.SEMICOLON:
+                expression = self.parse_expression()
+            self.expect(TokenType.SEMICOLON)
+            return ReturnStatement(expression)
+        
+        elif self.current_token.type == TokenType.IDENTIFIER:
             # Could be assignment or procedure call
             name = self.current_token.value
             self.advance()
