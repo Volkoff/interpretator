@@ -1,72 +1,72 @@
-# Oberon Compiler - User Guide
+# Oberonsky Kompajler
 
-A complete compiler for a subset of the Oberon programming language, implemented in Python with GCC backend for native compilation.
+Kompajler pro podmnozinu programovacího jazyka Oberon. Implementován v Pythonu s GCC backendem pro nativní kompilaci.
 
-## Project Structure
+## Struktura Projektu
 
 ```
 interpretator/
-├── output/              # Generated C files and executables
-├── examples/            # Example Oberon programs
-├── compiler.py          # Main compiler orchestration
-├── lexer.py             # Tokenizer
+├── output/              # Vygenerovane C soubory a spustitelne programy
+├── examples/            # Prikladove Oberon programy
+├── compiler.py          # Hlavni orchestrace kompajleru
+├── lexer.py             # Tokenizace
 ├── parser.py            # Parser
-├── oberon_ast.py        # Abstract Syntax Tree definitions
-├── semantic_analyzer.py # Semantic analysis
-├── c_emitter.py         # C code generator
-├── interpreter.py       # Python interpreter fallback
+├── oberon_ast.py        # Definice abstraktniho syntaktickeho stromu
+├── semantic_analyzer.py # Semanticka analyza
+├── c_emitter.py         # Generator C kodu
+├── interpreter.py       # Nahradvny Python interpreter
 ├── gui.py               # Tkinter IDE
-└── README.md            # This file
+└── README.md            # Tento soubor
 ```
 
-**Note:** All generated C files (.c) and executables (.exe) are automatically placed in the `output/` folder to keep the repository clean.
+Vsechny vygenerovane C soubory (.c) a spustitelne programy (.exe) jsou automaticky umisteny do slozky `output/`.
 
-## Quick Start
+## Rychly Start
 
-### Using the GUI
+### Pouziti GUI
 
 ```bash
 python gui.py
 ```
 
-This launches the Tkinter IDE where you can:
-- Write or paste Oberon code
-- Compile to native executable (GCC backend)
-- Run programs with integrated output display
-- Load example programs
+Spusti Tkinter IDE kde muzes:
+- Psat nebo vlozit Oberon kod
+- Kompajlovat na nativni spustitelny program (GCC backend)
+- Spoustet programy s integrovanym zobrazenim vystupu
+- Nacitat prikladove programy
 
-### Compiling from Command Line
+### Kompajlovani z Prikazoveho Radku
 
 ```bash
 python compiler.py examples/hello_world.oberon
 ```
 
-This will:
-1. Compile the Oberon source to C code (`output/hello_world.c`)
-2. Compile C code to native executable (`output/hello_world.exe`)
-3. Return the executable path
+To:
+1. Kompajluje Oberon kod na C (`output/hello_world.c`)
+2. Kompajluje C na nativni spustitelny program (`output/hello_world.exe`)
+3. Vraci cestu k spustitelnemu programu
 
-### Programmatic Use
+### Programovane Pouziti
 
 ```python
 from compiler import Compiler
 
-compiler = Compiler()  # Uses 'output/' folder by default
+compiler = Compiler()  # Pouziva 'output/' slozku
 messages, exe_path = compiler.compile_source(oberon_code, source_filename='myprogram')
 
 if exe_path:
-    print(f"Executable created at: {exe_path}")
+    print(f"Spustitelny program vytvoren: {exe_path}")
 ```
 
-## Supported Features
+## Podporovane Prvky
 
-### Data Types
-- `INTEGER` - 32-bit signed integers
-- `REAL` - Floating-point numbers
-- `STRING` - Text strings
-- `ARRAY` - One-dimensional and multi-dimensional arrays
+### Datove Typy
+- `INTEGER` - 32-bitova cela cisla
+- `REAL` - Cisla s plovajici carkou
+- `STRING` - Textove retezce
+- `ARRAY` - Jednorozmerná a vicerozmerná pole
 
-### Program Structure
+### Struktura Programu
 ```oberon
 MODULE ProgramName;
   VAR x: INTEGER;
@@ -76,17 +76,7 @@ BEGIN
 END ProgramName.
 ```
 
-### Variables and Constants
-```oberon
-MODULE Example;
-  CONST MAX = 100;
-  VAR count: INTEGER;
-BEGIN
-  count := MAX;
-END Example.
-```
-
-### Procedures and Functions
+### Procedury a Funkce
 ```oberon
 PROCEDURE Add(a, b: INTEGER): INTEGER;
 BEGIN
@@ -94,12 +84,12 @@ BEGIN
 END Add;
 ```
 
-### Control Structures
-- **IF-THEN-ELSE**
-- **WHILE loops**
-- **FOR loops**
+### Rizici Struktury
+- IF-THEN-ELSE
+- WHILE cykly
+- FOR cykly
 
-### Arrays
+### Pole
 ```oberon
 VAR arr: ARRAY 10 OF INTEGER;
 BEGIN
@@ -108,7 +98,7 @@ BEGIN
 END.
 ```
 
-### Multi-dimensional Arrays
+### Vicerozmerná Pole
 ```oberon
 VAR matrix: ARRAY 3, 3 OF INTEGER;
 BEGIN
@@ -116,382 +106,86 @@ BEGIN
 END.
 ```
 
-## Example Programs
+## Prikladove Programy
 
-All examples are in the `examples/` directory:
+Vsechny priklady jsou v adresar `examples/`:
 
-| File | Description |
-|------|-------------|
-| `hello_world.oberon` | Basic output program |
-| `arithmetic.oberon` | Integer and real arithmetic |
-| `control_structures.oberon` | IF, WHILE, FOR statements |
-| `procedures.oberon` | Procedure definitions and calls |
-| `simple_procedures.oberon` | Basic procedure example |
-| `arrays.oberon` | Single-dimensional arrays |
-| `arrays_2d.oberon` | Two-dimensional arrays |
-| `multidimensional_arrays.oberon` | N-dimensional arrays |
-| `simple_arrays.oberon` | Array basics |
-| `types_conversions.oberon` | Type handling |
-| `indirect_recursion.oberon` | Mutual recursion (even/odd) |
-| `nested_procedures.oberon` | Procedures within procedures |
+| Soubor | Popis |
+|--------|-------|
+| hello_world.oberon | Zakladni program s vystuem |
+| arithmetic.oberon | Celocisla a desitinna aritmetika |
+| control_structures.oberon | IF, WHILE, FOR prikazy |
+| procedures.oberon | Definice a volani procedur |
+| arrays.oberon | Jednorozmerná pole |
+| arrays_2d.oberon | Dvourozmerná pole |
+| multidimensional_arrays.oberon | N-rozmerná pole |
+| indirect_recursion.oberon | Vzajemna rekurze |
+| nested_procedures.oberon | Procedury v procedurah |
+| types_conversions.oberon | Manipulace s typy |
 
-## Usage Examples
-
-### Run hello_world.oberon
-```bash
-python oberon.py examples/hello_world.oberon
-```
-
-Output:
-```
-Hello, World!
-```
-
-### Compile arithmetic.oberon to LLVM IR
-```bash
-python oberon.py examples/arithmetic.oberon -c
-```
-
-Creates: `examples/arithmetic.ll`
-
-### Run with your own Oberon file
-```bash
-python oberon.py my_program.oberon
-```
-
-## Compiler Architecture
-
-### 1. Lexer (`lexer.py`)
-Converts source code characters into tokens:
-```
-"x := 42;" → IDENTIFIER('x') ASSIGN INTEGER_LITERAL('42') SEMICOLON
-```
-
-### 2. Parser (`parser.py`)
-Builds Abstract Syntax Tree (AST) from tokens using recursive descent parsing
-
-### 3. Semantic Analyzer (`semantic_analyzer.py`)
-- Validates variable declarations
-- Checks types
-- Manages symbol tables and scopes
-- Ensures no undefined variables
-
-### 4. Interpreter (`interpreter.py`)
-Directly executes the AST to produce output
-
-### 5. LLVM Emitter (`emitter.py`)
-Generates LLVM Intermediate Representation for potential native compilation
-
-## System Requirements
-
-- **Python 3.10+**
-- No external dependencies required for interpreter mode
-- (Optional) **Clang** for native executable generation
-
-## Command Reference
-
-### oberon.py
-```
-Usage: python oberon.py <source_file> [options]
-
-Options:
-  -c         Compile to LLVM IR only (creates .ll file)
-  -h         Show help message
-
-Examples:
-  python oberon.py program.oberon      # Run in interpreter mode
-  python oberon.py program.oberon -c   # Compile to LLVM IR
-```
-
-## Language Syntax
-
-### Program Structure
-```oberon
-MODULE ModuleName;
-  CONST constant = value;
-  VAR variable: TYPE;
-  
-  PROCEDURE SubroutineName;
-  BEGIN
-    (* procedure body *)
-  END SubroutineName;
-  
-BEGIN
-  (* main program *)
-END ModuleName.
-```
-
-### Variables
-```oberon
-VAR x, y: INTEGER;
-VAR name: STRING;
-VAR values: ARRAY 5 OF INTEGER;
-```
-
-### Types
-- `INTEGER` - whole numbers
-- `REAL` - decimals
-- `STRING` - text
-- `ARRAY n OF TYPE` - arrays with n elements
-
-### Operators
-- Arithmetic: `+`, `-`, `*`, `/`, `DIV`, `MOD`
-- Relational: `=`, `#` (not equal), `<`, `>`, `<=`, `>=`
-- Logical: `AND`, `OR`
-
-### Built-in Procedures
-- `Write(value)` - Output a value
-- `WriteLn()` - Output newline
-
-## Example Programs
-
-### Hello World
-```oberon
-MODULE HelloWorld;
-BEGIN
-  Write("Hello, World!");
-  WriteLn();
-END HelloWorld.
-```
-
-### Factorial (Recursive)
-```oberon
-MODULE Factorial;
-  
-  PROCEDURE Factorial(n: INTEGER): INTEGER;
-  BEGIN
-    IF n <= 1 THEN
-      RETURN 1;
-    ELSE
-      RETURN n * Factorial(n - 1);
-    END;
-  END Factorial;
-  
-BEGIN
-  Write(Factorial(5));
-  WriteLn();
-END Factorial.
-```
-
-### Loop Example
-```oberon
-MODULE Loops;
-  VAR i: INTEGER;
-BEGIN
-  FOR i := 1 TO 10 DO
-    Write(i);
-    Write(" ");
-  END;
-  WriteLn();
-END Loops.
-```
-
-### Array Example
-```oberon
-MODULE Arrays;
-  VAR arr: ARRAY 5 OF INTEGER;
-      i: INTEGER;
-BEGIN
-  FOR i := 0 TO 4 DO
-    arr[i] := i * 2;
-  END;
-  
-  FOR i := 0 TO 4 DO
-    Write(arr[i]);
-    Write(" ");
-  END;
-  WriteLn();
-END Arrays.
-```
-
-## Project Files
-
-- `oberon.py` - Main executable wrapper
-- `compiler.py` - Compilation orchestrator
-- `lexer.py` - Lexical analyzer
-- `parser.py` - Parser
-- `semantic_analyzer.py` - Type checker and validator
-- `interpreter.py` - AST interpreter
-- `emitter.py` - LLVM IR generator
-- `oberon_ast.py` - AST node definitions
-- `gui.py` - GUI IDE (optional)
-- `grammar.ebnf` - Formal language grammar
-- `examples/` - Sample programs
-
-## Execution Flow
-
-```
-Source Code (.oberon)
-        ↓
-    Lexer
-        ↓
-   Tokens
-        ↓
-    Parser
-        ↓
-      AST
-        ↓
-Semantic Analyzer
-        ↓
-   Validated AST
-        ↓
-   Interpreter / Emitter
-        ↓
-  Output / LLVM IR
-```
-
-## Testing
-
-All 12 example programs pass comprehensive testing:
-- ✅ hello_world.oberon
-- ✅ arithmetic.oberon
-- ✅ arrays.oberon
-- ✅ arrays_2d.oberon
-- ✅ control_structures.oberon
-- ✅ indirect_recursion.oberon
-- ✅ multidimensional_arrays.oberon
-- ✅ nested_procedures.oberon
-- ✅ procedures.oberon
-- ✅ simple_arrays.oberon
-- ✅ simple_procedures.oberon
-- ✅ types_conversions.oberon
-
-## GUI IDE
-
-Run the graphical IDE:
-```bash
-python gui.py
-```
-
-Features:
-- Syntax highlighting
-- Real-time compilation
-- Output display
-- File management
-
-### Running Examples
+## Spusteni Programu
 
 ```bash
 # Hello World
 python compiler.py examples/hello_world.oberon
 
-# Arithmetic operations
+# Aritmetika
 python compiler.py examples/arithmetic.oberon
 
-# Control structures
+# Rizici struktury
 python compiler.py examples/control_structures.oberon
 
-# Procedures
+# Procedury
 python compiler.py examples/procedures.oberon
 
-# Arrays
+# Pole
 python compiler.py examples/arrays.oberon
 ```
 
-## Language Syntax
+## Architektura Kompajleru
 
-### Program Structure
+1. **Lexer** - Tokenizace zdrojoveho kodu
+2. **Parser** - Vytvoreni abstraktniho syntaktickeho stromu (AST)
+3. **Semanticka Analyza** - Kontrola typu a oveovani promennnych
+4. **C Emitter** - Vytvoreni C kodu
+5. **GCC** - Nativni kompilace na spustitelny program
+
+## Syntaxe Jazyka
+
+Oberon-0 podmnozina:
+
 ```oberon
-MODULE ModuleName;
-VAR variable: TYPE;
-PROCEDURE ProcName(param: TYPE): RETURN_TYPE;
+MODULE Program;
+  VAR x: INTEGER;
+  
+  PROCEDURE DoSomething(n: INTEGER): INTEGER;
+  BEGIN
+    RETURN n * 2;
+  END DoSomething;
+  
 BEGIN
-    statements;
-END ProcName;
-BEGIN
-    statements;
-END ModuleName.
+  x := 42;
+  Write(DoSomething(x));
+  WriteLn();
+END Program.
 ```
 
-### Data Types
-- `INTEGER`: Integer numbers
-- `REAL`: Floating-point numbers  
-- `STRING`: String literals
-- `ARRAY[size] OF type`: Arrays
+## Operatory
 
-### Control Structures
-```oberon
-IF condition THEN
-    statement;
-ELSE
-    statement;
-END;
+Aritmeticke: `+`, `-`, `*`, `/`, `DIV`, `MOD`
+Relacni: `=`, `#`, `<`, `>`, `<=`, `>=`
+Logicke: `AND`, `OR`
 
-WHILE condition DO
-    statement;
-END;
+## Vstavene Procedury
 
-FOR variable := start TO end DO
-    statement;
-END;
-```
+- `Write(value)` - Vypis hodnoty
+- `WriteLn()` - Vypis noveho radku
 
-### Procedures
-```oberon
-PROCEDURE ProcName(param1, param2: TYPE): RETURN_TYPE;
-VAR localVar: TYPE;
-BEGIN
-    statements;
-END ProcName;
-```
+## Pozadavky
 
-## Implementation Details
+- Python 3.10+
+- GCC (pro nativni kompilaci)
 
-### Lexical Analysis
-- Tokenizes source code into tokens (keywords, identifiers, literals, operators)
-- Handles whitespace and comments
-- Supports integer, real, and string literals
+## Testovani
 
-### Syntactic Analysis
-- Recursive descent parser
-- Builds AST with proper operator precedence
-- Handles nested structures and scoping
-
-### Semantic Analysis
-- Type checking for assignments and operations
-- Variable existence validation
-- Parameter type checking for procedure calls
-- Array bounds checking
-
-### Interpretation
-- Executes AST nodes in order
-- Maintains variable scopes
-- Handles procedure calls with parameter passing
-- Produces text output
-
-## Requirements
-
-- Python 3.6+
-- No external dependencies (pure Python implementation)
-
-## Limitations
-
-This is a simplified implementation with the following limitations:
-
-- No file I/O operations (except for reading source files)
-- No input operations (Read procedures)
-- Limited error recovery
-- No optimization
-- Simple interpreter (not a code generator)
-
-## Future Enhancements
-
-- Code generation (assembly or bytecode)
-- More sophisticated error messages
-- Additional built-in procedures
-- File I/O support
-- Better optimization
-- More comprehensive type system
-
-## Academic Context
-
-This compiler was developed as part of a compiler construction course, demonstrating:
-
-- Lexical analysis and tokenization
-- Syntax analysis and AST construction
-- Semantic analysis and type checking
-- Code interpretation and execution
-- EBNF grammar specification
-- Complete compiler pipeline
-
-The implementation follows compiler construction principles and provides a foundation for understanding how programming languages are processed and executed.
+Vsech 12 prikladovych programu pracuje bez problemu.
