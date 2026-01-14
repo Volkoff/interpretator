@@ -10,12 +10,16 @@ from typing import List
 from lexer import Lexer
 from parser import Parser
 from semantic_analyzer import SemanticAnalyzer
-from emitter import LLVMEmitter
+from c_emitter import CEmitter
 
 
 class Compiler:
-    def __init__(self):
+    def __init__(self, output_dir: str = 'output'):
         self.semantic_analyzer = SemanticAnalyzer()
+        self.output_dir = output_dir
+        # Create output directory if it doesn't exist
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
     def compile_file(self, filename: str, build_native: bool = True) -> (List[str], str):
         """Kompiluje zdrojovy soubor na LLVM IR"""
@@ -30,7 +34,7 @@ class Compiler:
             return [f"Error reading file: {e}"], ""
 
     def compile_source(self, source: str, source_filename: str = 'program', build_native: bool = True) -> (List[str], str):
-        """Kompiluje zdrojovy kod na LLVM IR a pripadne na nativni spustitelny kod"""
+        """Compile Oberon source code to C, then to native executable using GCC"""
         try:
             lexer = Lexer(source)
             tokens = lexer.tokenize()
@@ -42,56 +46,81 @@ class Compiler:
             if errors:
                 return [f"Semantic error: {err}" for err in errors], ""
 
-            emitter = LLVMEmitter()
-            ll_code = emitter.emit_program(ast)
-            ll_filename = source_filename + '.ll'
+            # Emit C code
+            emitter = CEmitter()
+            c_code = emitter.emit_program(ast)
+            c_filename = os.path.join(self.output_dir, source_filename + '.c')
             try:
-                with open(ll_filename, 'w', encoding='utf-8') as f:
-                    f.write(ll_code)
+                with open(c_filename, 'w', encoding='utf-8') as f:
+                    f.write(c_code)
             except Exception as e:
-                return [f"Error writing LLVM IR file: {e}"], ""
+                return [f"Error writing C file: {e}"], ""
 
             if not build_native:
-                return [f"Wrote LLVM IR to {ll_filename}"], ""
+                return [f"Wrote C code to {c_filename}"], ""
 
-            clang_path = shutil.which('clang') or shutil.which('clang.exe')
-            if not clang_path:
-                msg = f"Wrote LLVM IR to {ll_filename}.\n'clang' not found in PATH.\nFalling back to Python interpreter mode."
-                
+            # Find GCC (check multiple locations)
+            gcc_path = shutil.which('gcc') or shutil.which('gcc.exe')
+            
+            # If not found in PATH, check MSYS2 installation
+            if not gcc_path:
+                msys2_paths = [
+                    r"C:\msys64\mingw64\bin\gcc.exe",
+                    r"C:\msys64\mingw32\bin\gcc.exe",
+                    r"C:\msys32\mingw64\bin\gcc.exe",
+                    r"C:\msys32\mingw32\bin\gcc.exe",
+                ]
+                for path in msys2_paths:
+                    if os.path.exists(path):
+                        gcc_path = path
+                        break
+            
+            if not gcc_path:
+                gcc_path = shutil.which('cc') or shutil.which('cc.exe')
+            
+            if not gcc_path:
                 from interpreter import Interpreter
                 try:
                     interpreter = Interpreter()
                     output = interpreter.interpret(ast)
-                    return [msg, "Program executed successfully in interpreter mode"] + output, ""
+                    return [f"C code written to {c_filename}", "'gcc' not found. Running in interpreter mode."] + output, ""
                 except Exception as e:
-                    return [msg, f"Interpreter error: {e}"], ""
+                    return [f"C code written to {c_filename}", f"Interpreter error: {e}"], ""
 
-            exe_filename = source_filename + ('.exe' if os.name == 'nt' else '')
+            exe_filename = os.path.join(self.output_dir, source_filename + ('.exe' if os.name == 'nt' else ''))
+            
             try:
+                # Try to use wrapper first if available, fall back to direct gcc
+                wrapper_path = os.path.join(os.path.dirname(__file__), 'compile_wrapper.bat')
+                compiler_path = wrapper_path if os.path.exists(wrapper_path) else gcc_path
+                
+                # Compile C file to executable using GCC
                 proc = subprocess.run(
-                    [clang_path, ll_filename, '-o', exe_filename],
+                    [compiler_path, c_filename, '-o', exe_filename, '-Wall', '-Wextra'],
                     capture_output=True, text=True, check=False
                 )
-                if proc.returncode != 0:
-                    error_msg = f"Clang error: {proc.stderr.strip()}"
-                    fallback_msg = "Falling back to Python interpreter mode..."
+                
+                # Check if compilation succeeded
+                if proc.returncode == 0 and os.path.exists(exe_filename):
+                    success_msg = f"Successfully created executable: {exe_filename}"
+                    return [f"Wrote C code to {c_filename}", success_msg], exe_filename
+                else:
+                    # Compilation failed, show error and fall back to interpreter
+                    error_msg = f"GCC error:\n{proc.stderr.strip()}" if proc.stderr else "GCC compilation failed"
                     
                     from interpreter import Interpreter
                     try:
                         interpreter = Interpreter()
                         output = interpreter.interpret(ast)
-                        return [f"LLVM IR written to {ll_filename}", error_msg, fallback_msg, "Program executed successfully in interpreter mode"] + output, ""
+                        return [f"C code written to {c_filename}", error_msg, "Falling back to Python interpreter mode..."] + output, ""
                     except Exception as e:
-                        return [f"LLVM IR written to {ll_filename}", error_msg, fallback_msg, f"Interpreter error: {e}"], ""
-                
-                success_msg = f"Successfully created executable: {exe_filename}"
-                return [f"Wrote LLVM IR to {ll_filename}", success_msg], exe_filename
+                        return [f"C code written to {c_filename}", error_msg, f"Interpreter error: {e}"], ""
 
             except Exception as e:
-                return [f"LLVM IR written to {ll_filename}", f"Error invoking clang: {e}"], ""
+                return [f"C code written to {c_filename}", f"Error during compilation: {e}"], ""
 
         except Exception as e:
-            # Zachytí chyby z lexeru/parseru
+            # Catch errors from lexer/parser
             return [f"Compilation error: {e}"], ""
 
 

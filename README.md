@@ -1,22 +1,62 @@
 # Oberon Compiler - User Guide
 
-A complete compiler for a subset of the Oberon programming language, implemented in Python.
+A complete compiler for a subset of the Oberon programming language, implemented in Python with GCC backend for native compilation.
+
+## Project Structure
+
+```
+interpretator/
+├── output/              # Generated C files and executables
+├── examples/            # Example Oberon programs
+├── compiler.py          # Main compiler orchestration
+├── lexer.py             # Tokenizer
+├── parser.py            # Parser
+├── oberon_ast.py        # Abstract Syntax Tree definitions
+├── semantic_analyzer.py # Semantic analysis
+├── c_emitter.py         # C code generator
+├── interpreter.py       # Python interpreter fallback
+├── gui.py               # Tkinter IDE
+└── README.md            # This file
+```
+
+**Note:** All generated C files (.c) and executables (.exe) are automatically placed in the `output/` folder to keep the repository clean.
 
 ## Quick Start
 
-### Running an Oberon Program
+### Using the GUI
 
 ```bash
-python oberon.py examples/hello_world.oberon
+python gui.py
 ```
 
-### Compiling to LLVM IR
+This launches the Tkinter IDE where you can:
+- Write or paste Oberon code
+- Compile to native executable (GCC backend)
+- Run programs with integrated output display
+- Load example programs
+
+### Compiling from Command Line
 
 ```bash
-python oberon.py examples/hello_world.oberon -c
+python compiler.py examples/hello_world.oberon
 ```
 
-This creates a `.ll` file (LLVM Intermediate Representation) in the same directory.
+This will:
+1. Compile the Oberon source to C code (`output/hello_world.c`)
+2. Compile C code to native executable (`output/hello_world.exe`)
+3. Return the executable path
+
+### Programmatic Use
+
+```python
+from compiler import Compiler
+
+compiler = Compiler()  # Uses 'output/' folder by default
+messages, exe_path = compiler.compile_source(oberon_code, source_filename='myprogram')
+
+if exe_path:
+    print(f"Executable created at: {exe_path}")
+```
 
 ## Supported Features
 
